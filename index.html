@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- pptfz.github.io/studylog：纯静态单文件。默认访客只读浏览（匿名读取公开仓库 JSON）；「管理员登录」通过 GitHub 令牌服务端校验 + 可选本地口令 + 两步验证 MFA（TOTP）后解锁编辑，数据经 GitHub API 存回仓库 JSON，跨设备同步；令牌仅存本机浏览器 localStorage -->
+<!-- 学习目标管理台（GitHub Pages 同步版）：纯静态单文件。默认访客只读浏览（匿名读取公开仓库 JSON）；「管理员登录」通过 GitHub 令牌服务端校验 + 可选本地口令 + 两步验证 MFA（TOTP）后解锁编辑，数据经 GitHub API 存回仓库 JSON，跨设备同步；令牌仅存本机浏览器 localStorage -->
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>pptfz.github.io/studylog</title>
+<title>学习记录台（GitHub Pages 同步版）</title>
 <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 <style>
   :root{
@@ -51,7 +51,7 @@
       align-items:stretch; padding:18px 12px; box-shadow:1px 0 0 var(--line); gap:6px;
     }
     .nav .navbtn{flex:none; flex-direction:row; gap:12px; justify-content:flex-start; font-size:15px; padding:13px 14px; min-height:48px}
-    .nav .brand{font-size:13px;font-weight:800;color:var(--purple);padding:6px 10px 18px;display:flex;align-items:center;gap:8px;word-break:break-all}
+    .nav .brand{font-size:17px;font-weight:800;color:var(--purple);padding:6px 14px 18px;display:flex;align-items:center;gap:8px}
     .nav .brand svg{width:24px;height:24px}
     .main{margin-left:210px; padding:26px 30px}
   }
@@ -286,7 +286,7 @@
   </div>
 </div>
 <div class="nav" id="nav">
-  <div class="brand"><svg viewBox="0 0 24 24" fill="none"><path d="M4 5h16v14H4z" stroke="#7C5CFF" stroke-width="2" stroke-linejoin="round"/><path d="M8 9h8M8 13h5" stroke="#9D7BFF" stroke-width="2" stroke-linecap="round"/></svg>pptfz.github.io/studylog</div>
+  <div class="brand"><svg viewBox="0 0 24 24" fill="none"><path d="M4 5h16v14H4z" stroke="#7C5CFF" stroke-width="2" stroke-linejoin="round"/><path d="M8 9h8M8 13h5" stroke="#9D7BFF" stroke-width="2" stroke-linecap="round"/></svg>学习记录台</div>
   <button class="navbtn active" data-tab="today"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M12 7v5l3 2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>今日</button>
   <button class="navbtn" data-tab="board"><svg viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="2"/><rect x="13" y="4" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="2"/><rect x="4" y="13" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="2"/><rect x="13" y="13" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="2"/></svg>看板</button>
   <button class="navbtn" data-tab="stats"><svg viewBox="0 0 24 24" fill="none"><path d="M5 20V12M12 20V4M19 20V8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>统计</button>
@@ -297,7 +297,7 @@
 <div class="main">
   <!-- TODAY -->
   <section class="tab active" id="tab-today">
-    <div class="brand"><svg viewBox="0 0 24 24" fill="none"><path d="M4 5h16v14H4z" stroke="#7C5CFF" stroke-width="2" stroke-linejoin="round"/><path d="M8 9h8M8 13h5" stroke="#9D7BFF" stroke-width="2" stroke-linecap="round"/></svg>pptfz.github.io/studylog</div>
+    <div class="brand"><svg viewBox="0 0 24 24" fill="none"><path d="M4 5h16v14H4z" stroke="#7C5CFF" stroke-width="2" stroke-linejoin="round"/><path d="M8 9h8M8 13h5" stroke="#9D7BFF" stroke-width="2" stroke-linecap="round"/></svg>学习记录台</div>
     <button class="btn btn-primary btn-block edit-only" id="new-goal-top"><svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/></svg>新建学习主题</button>
     <div class="section-title">今天要处理</div>
     <div id="today-handle"></div>
@@ -409,7 +409,7 @@
       <div style="font-weight:800;margin-bottom:10px">添加到手机主屏幕</div>
       <div class="step"><span class="n">1</span><div>打开本页面后，点右上角 / 底部工具栏的 <b>分享</b>（iOS 为方框箭头图标，安卓为 ⋮ 或分享）。</div></div>
       <div class="step"><span class="n">2</span><div>iOS 选「添加到主屏幕」；安卓选「安装应用 / 添加到主屏幕」。</div></div>
-      <div class="step"><span class="n">3</span><div>命名为「pptfz.github.io/studylog」，完成后桌面出现图标，点开即用的在线工作台。</div></div>
+      <div class="step"><span class="n">3</span><div>命名为「学习目标台」，完成后桌面出现图标，点开即用的在线工作台。</div></div>
     </div>
   </section>
 </div>
@@ -548,7 +548,7 @@
   function ghDoPush(msg){
     var cfg=readGhCfg();
     var payload=JSON.stringify({version:1,goals:store.goals,records:store.records,weeks:store.weeks,auth:store.auth||null});
-    var body={message:msg||"sync: pptfz.github.io/studylog",content:b64e(payload)}; // 不带 branch：提交到仓库默认分支
+    var body={message:msg||"sync: 学习目标管理台",content:b64e(payload)}; // 不带 branch：提交到仓库默认分支
     if(store.sha)body.sha=store.sha;
     return ghApi("PUT",ghUrl(),body).then(function(j){
       if(j&&j.content&&j.content.sha)store.sha=j.content.sha;
@@ -581,7 +581,7 @@
       persistTimer=setTimeout(function(){
         var cfg=effectiveCfg();
         if(!canEdit()||!cfg||!cfg.owner||!cfg.repo||!cfg.token){dirty=false;persistPromise=null;resolve();return;}
-        ghPush("sync: pptfz.github.io/studylog").then(function(){dirty=false;persistPromise=null;resolve();},function(e){persistPromise=null;reject(e);});
+        ghPush("sync: 学习目标管理台").then(function(){dirty=false;persistPromise=null;resolve();},function(e){persistPromise=null;reject(e);});
       },700);
     });
     return persistPromise;
@@ -1169,7 +1169,7 @@
       if(remote&&remote.data){setStoreFromRemote(remote);return null;}
       if(canEdit()){ // 管理员且远端无数据文件：初始化
         if(!restoreLocalCache())seedSample();
-        return ghPush("init: pptfz.github.io/studylog 数据").then(function(){return null;},function(err){
+        return ghPush("init: 学习目标管理台数据").then(function(){return null;},function(err){
           throw new Error("初始化数据文件被拒绝（写入 403）："+(err&&err.message?err.message:"")+"——请确认令牌勾选了本仓库且 Contents 为 Read and write");
         });
       }
