@@ -272,7 +272,7 @@
       <button class="btn btn-primary" id="lk-go" style="flex:2">验证并进入</button>
       <button class="btn btn-soft" id="lk-skip" style="flex:1">只读浏览</button>
     </div>
-    <div class="lock-tip">令牌仅存在本机浏览器，不会写入页面或随代码上传。获取：GitHub → Settings → Developer settings → Fine-grained tokens → 勾选该仓库 Contents 读写。</div>
+    <div class="lock-tip">令牌仅存在本机浏览器：首次登录填一次，之后重新验证只需本地口令和动态码，令牌留空即可。换浏览器/清除缓存才需重新获取：GitHub → Settings → Developer settings → Fine-grained tokens → 勾选该仓库 Contents 读写。</div>
     <div id="lock-err" class="lock-err hidden"></div>
   </div>
 </div>
@@ -371,6 +371,7 @@
           <option value="1">仅 1 天</option>
           <option value="7">7 天</option>
           <option value="30">30 天</option>
+          <option value="90">90 天</option>
         </select>
       </div>
       <div class="row spread edit-only" style="margin-bottom:12px"><span class="small muted">本地口令</span><span class="small" id="sec-pin">未设置</span></div>
@@ -672,6 +673,7 @@
     $("lk-branch").value=cfg.branch||"main";
     $("lk-path").value=cfg.path||"data/workspace.json";
     $("lk-token").value="";
+    $("lk-token").placeholder=(cfg&&cfg.token)?"已保存在本机 · 重新登录留空即可":"github_pat_… / ghp_…";
     var who=$("lock-who"),pinRow=$("lk-pin-row");
     var u=readUnlock();
     if(u&&u.login){who.textContent="上次登录："+u.login+"（会话已过期，请重新验证）";who.classList.remove("hidden");}
@@ -699,8 +701,8 @@
   function lockVerify(){
     var owner=$("lk-owner").value.trim(),repo=$("lk-repo").value.trim(),
         branch=$("lk-branch").value.trim()||"main",path=$("lk-path").value.trim()||"data/workspace.json",
-        token=$("lk-token").value.trim();
-    if(!owner||!repo||!token){setLockErr("请填写用户名、仓库名和令牌");return;}
+        token=$("lk-token").value.trim()||((readGhCfg()||{}).token||""); // 本机已保存令牌时留空沿用
+    if(!owner||!repo||!token){setLockErr("请填写用户名、仓库名和令牌（本机保存过令牌时，令牌一项可留空）");return;}
     if(readPin()){
       var pin=$("lk-pin").value;
       if(pin!==readPin()){setLockErr("本地口令不正确");return;}
