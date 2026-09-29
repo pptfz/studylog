@@ -503,12 +503,31 @@
     return derivedCfg()||{owner:"",repo:"",branch:"main",path:"data/workspace.json",token:""};
   }
   function ghUrl(){var c=effectiveCfg();return "https://api.github.com/repos/"+encodeURIComponent(c.owner)+"/"+encodeURIComponent(c.repo)+"/contents/"+c.path.split("/").map(encodeURIComponent).join("/");}
+  function strHash(s){var h=5381,i;for(i=0;i<s.length;i++)h=((h<<5)+h+s.charCodeAt(i))|0;return "raw-"+((h>>>0).toString(36))+"-"+s.length;}
+  function ghRawUrl(){ // 访客读取走 raw CDN：无 API 限流、支持跨域，HEAD=仓库默认分支
+    var c=effectiveCfg();
+    return "https://raw.githubusercontent.com/"+encodeURIComponent(c.owner)+"/"+encodeURIComponent(c.repo)+"/HEAD/"+c.path.split("/").map(encodeURIComponent).join("/");
+  }
   function ghFetchRemote(){
-    var c=readGhCfg();
-    return ghApi("GET",ghUrl()+"?ref="+encodeURIComponent(c.branch||"main")).then(function(j){
-      var data={};try{data=JSON.parse(b64d(j.content||""))||{};}catch(e){data={};}
-      return {sha:j.sha,data:data};
-    }).catch(function(err){if(err&&err.status===404)return {sha:null,data:null};throw err;});
+    var c=effectiveCfg();
+    if(c&&c.token){ // 管理员：走 Contents API（能拿到 sha，推送时需要）
+      return ghApi("GET",ghUrl()).then(function(j){
+        var data={};try{data=JSON.parse(b64d(j.content||""))||{};}catch(e){data={};}
+        return {sha:j.sha,data:data};
+      }).catch(function(err){if(err&&err.status===404)return {sha:null,data:null};throw err;});
+    }
+    // 访客：raw CDN 读取（?t= 按分钟缓存穿透，保证 ~1 分钟内看到更新）
+    return fetch(ghRawUrl()+"?t="+Math.floor(Date.now()/60000)).then(function(res){
+      if(res.status===404)return {sha:null,data:null};
+      if(!res.ok)throw new Error("数据读取失败（"+res.status+"），请稍后重试");
+      return res.text().then(function(t){
+        var data={};try{data=JSON.parse(t)||{};}catch(e){}
+        return {sha:strHash(t),data:data};
+      });
+    }).catch(function(err){
+      if(err&&err.message&&err.message.indexOf("数据读取失败")===0)throw err;
+      throw new Error("网络异常，无法读取学习数据");
+    });
   }
   function setStoreFromRemote(remote){
     var d=remote&&remote.data?remote.data:{};
@@ -520,7 +539,7 @@
   function ghDoPush(msg){
     var cfg=readGhCfg();
     var payload=JSON.stringify({version:1,goals:store.goals,records:store.records,weeks:store.weeks,auth:store.auth||null});
-    var body={message:msg||"sync: 学习目标管理台",content:b64e(payload),branch:cfg.branch||"main"};
+    var body={message:msg||"sync: 学习目标管理台",content:b64e(payload)}; // 不带 branch：提交到仓库默认分支
     if(store.sha)body.sha=store.sha;
     return ghApi("PUT",ghUrl(),body).then(function(j){
       if(j&&j.content&&j.content.sha)store.sha=j.content.sha;
@@ -1104,7 +1123,7 @@
   function pollRemote(){
     var cfg=effectiveCfg();
     if(!cfg||!cfg.owner||!cfg.repo||pollBusy||dirty)return;
-    if(!cfg.token&&Date.now()-pollLast<300000)return; // 匿名请求限流 60 次/小时：访客至少间隔 5 分钟轮询
+    if(!cfg.token&&Date.now()-pollLast<60000)return; // 访客走 raw CDN 无 API 限流，仍保持 60 秒节流
     pollLast=Date.now();
     pollBusy=true;
     ghFetchRemote().then(function(remote){
