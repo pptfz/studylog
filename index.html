@@ -1163,7 +1163,9 @@
       if(remote&&remote.data){setStoreFromRemote(remote);return null;}
       if(canEdit()){ // 管理员且远端无数据文件：初始化
         if(!restoreLocalCache())seedSample();
-        return ghPush("init: 学习目标管理台数据").then(function(){return null;});
+        return ghPush("init: 学习目标管理台数据").then(function(){return null;},function(err){
+          throw new Error("初始化数据文件被拒绝（写入 403）："+(err&&err.message?err.message:"")+"——请确认令牌勾选了本仓库且 Contents 为 Read and write");
+        });
       }
       // 访客：远端无数据文件（或仓库私有导致 404）→ 展示空数据
       store.goals=[];store.records=[];store.weeks=[];store.auth=null;store.sha=null;
