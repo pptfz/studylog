@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- 学习目标管理台（GitHub Pages 同步版）：纯静态单文件，数据经 GitHub API 存回仓库 JSON，跨设备同步；令牌仅存本机浏览器 localStorage存放在用户自己的 GitHub 仓库（Contents API 读写），跨设备同步；令牌仅存本机浏览器 localStorage -->
+<!-- 学习目标管理台（GitHub Pages 同步版）：纯静态单文件。默认访客只读浏览（匿名读取公开仓库 JSON）；「管理员登录」通过 GitHub 令牌服务端校验 + 可选本地口令 + 两步验证 MFA（TOTP）后解锁编辑，数据经 GitHub API 存回仓库 JSON，跨设备同步；令牌仅存本机浏览器 localStorage -->
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
@@ -240,13 +240,24 @@
   .lock-err{background:var(--redSoft);color:var(--red);border-radius:11px;padding:10px 12px;font-size:13px;margin-top:10px}
   .lock-tip{font-size:12px;color:var(--muted2);margin-top:12px;line-height:1.6}
   .lock-who{display:flex;align-items:center;gap:8px;background:var(--greenSoft);color:#157a4b;border-radius:11px;padding:10px 12px;font-size:13px;font-weight:700;margin-bottom:12px}
+
+  /* ===== 只读模式（访客）===== */
+  body.readonly .edit-only{display:none!important}
+  body.readonly .ci-form,body.readonly .ci-actions,body.readonly .rec-del,body.readonly .qmark{display:none!important}
+  body.readonly #tab-week textarea{pointer-events:none;background:var(--bg)}
+  #ro-bar{display:none;position:fixed;left:0;right:0;top:0;z-index:60;background:var(--purpleSoft);color:var(--purple);
+    font-size:13px;font-weight:700;padding:9px 14px;text-align:center;cursor:pointer;box-shadow:0 1px 0 var(--line)}
+  body.readonly #ro-bar{display:block}
+  body.readonly .main{padding-top:52px}
+  @media (min-width:1024px){body.readonly .main{padding-top:60px}}
 </style>
 </head>
 <body>
+<div id="ro-bar">只读模式 · 点击登录管理员后可编辑</div>
 <div id="lock" class="hidden">
   <div class="lock-card">
-    <div class="lock-logo"><svg viewBox="0 0 24 24" fill="none"><path d="M4 5h16v14H4z" stroke="#7C5CFF" stroke-width="2" stroke-linejoin="round"/><path d="M8 9h8M8 13h5" stroke="#9D7BFF" stroke-width="2" stroke-linecap="round"/></svg>学习记录台</div>
-    <div class="lock-desc">数据存放在你自己的 GitHub 仓库。请输入仓库信息并验证令牌后进入——校验由 GitHub 完成，验证通过才会加载数据。</div>
+    <div class="lock-logo"><svg viewBox="0 0 24 24" fill="none"><path d="M4 5h16v14H4z" stroke="#7C5CFF" stroke-width="2" stroke-linejoin="round"/><path d="M8 9h8M8 13h5" stroke="#9D7BFF" stroke-width="2" stroke-linecap="round"/></svg>管理员登录</div>
+    <div class="lock-desc">默认所有人可只读浏览（数据仓库需公开）。登录管理员后可打卡、新建和编辑——校验由 GitHub 服务端完成，可叠加本地口令与两步验证。</div>
     <div id="lock-who" class="lock-who hidden"></div>
     <div class="form-row"><label>GitHub 用户名 / 组织</label><input id="lk-owner" placeholder="如：yourname" autocomplete="username"></div>
     <div class="form-row"><label>数据仓库名（建议私有）</label><input id="lk-repo" placeholder="如：my-data"></div>
@@ -257,7 +268,10 @@
     <div class="form-row"><label>Personal Access Token</label><input id="lk-token" type="password" placeholder="github_pat_… / ghp_…" autocomplete="current-password"></div>
     <div class="form-row hidden" id="lk-pin-row"><label>本地口令（本机已设置）</label><input id="lk-pin" type="password" inputmode="numeric" placeholder="输入本地口令" autocomplete="off"></div>
     <div class="form-row hidden" id="lk-mfa-row"><label>动态验证码（验证器 App 6 位）</label><input id="lk-mfa" type="text" inputmode="numeric" maxlength="6" placeholder="000000" autocomplete="one-time-code"></div>
-    <button class="btn btn-primary btn-block" id="lk-go" style="margin-top:6px">验证并进入</button>
+    <div class="row" style="gap:10px;margin-top:6px">
+      <button class="btn btn-primary" id="lk-go" style="flex:2">验证并进入</button>
+      <button class="btn btn-soft" id="lk-skip" style="flex:1">只读浏览</button>
+    </div>
     <div class="lock-tip">令牌仅存在本机浏览器，不会写入页面或随代码上传。获取：GitHub → Settings → Developer settings → Fine-grained tokens → 勾选该仓库 Contents 读写。</div>
     <div id="lock-err" class="lock-err hidden"></div>
   </div>
@@ -275,12 +289,12 @@
   <!-- TODAY -->
   <section class="tab active" id="tab-today">
     <div class="brand"><svg viewBox="0 0 24 24" fill="none"><path d="M4 5h16v14H4z" stroke="#7C5CFF" stroke-width="2" stroke-linejoin="round"/><path d="M8 9h8M8 13h5" stroke="#9D7BFF" stroke-width="2" stroke-linecap="round"/></svg>学习记录台</div>
-    <button class="btn btn-primary btn-block" id="new-goal-top"><svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/></svg>新建学习主题</button>
+    <button class="btn btn-primary btn-block edit-only" id="new-goal-top"><svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/></svg>新建学习主题</button>
     <div class="section-title">今天要处理</div>
     <div id="today-handle"></div>
     <div class="section-title">可直接打卡</div>
     <div id="today-list"></div>
-    <button class="btn btn-ghost btn-block" id="new-goal-bottom" style="margin-top:6px"><svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="#7C5CFF" stroke-width="2.4" stroke-linecap="round"/></svg>新建学习主题</button>
+    <button class="btn btn-ghost btn-block edit-only" id="new-goal-bottom" style="margin-top:6px"><svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="#7C5CFF" stroke-width="2.4" stroke-linecap="round"/></svg>新建学习主题</button>
   </section>
 
   <!-- BOARD -->
@@ -316,7 +330,7 @@
       <div class="fld-col"><label>下周预案</label><textarea id="wk-plan" placeholder="下周打算"></textarea></div>
     </div>
     <div class="row" style="gap:10px;margin:14px 0">
-      <button class="btn btn-primary" id="wk-save" style="flex:1"><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>保存周报</button>
+      <button class="btn btn-primary edit-only" id="wk-save" style="flex:1"><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>保存周报</button>
       <button class="btn btn-soft" id="wk-gen" style="flex:1"><svg viewBox="0 0 24 24" fill="none"><path d="M5 4h14v16H5z" stroke="currentColor" stroke-width="2"/><path d="M8 9h8M8 13h8M8 17h5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>生成周报文本</button>
     </div>
   </section>
@@ -333,7 +347,7 @@
         <button class="btn btn-line" id="sync-btn" style="margin-left:auto">重新同步</button>
       </div>
     </div>
-    <div class="card">
+    <div class="card edit-only">
       <div style="font-weight:800;margin-bottom:6px">GitHub 同步配置</div>
       <div class="small muted" style="margin-bottom:10px">数据以 JSON 文件保存在你自己的 GitHub 仓库里，任何电脑填同一套配置即可看到并续写全部记录。令牌只存在本机浏览器，不会写进页面。</div>
       <div class="form-2">
@@ -350,28 +364,28 @@
     </div>
         <div class="card">
       <div style="font-weight:800;margin-bottom:10px">登录与安全</div>
-      <div class="small muted" style="margin-bottom:10px">进入页面需通过 GitHub 令牌校验（由 GitHub 服务端验证），可叠加本机口令，防止他人用本机随手打开。</div>
-      <div class="row spread" style="margin-bottom:8px"><span class="small muted">当前身份</span><span class="small" id="sec-who">未登录</span></div>
-      <div class="row spread" style="margin-bottom:8px"><span class="small muted">记住登录</span>
+      <div class="small muted" style="margin-bottom:10px">默认访客只读浏览。管理员登录需 GitHub 令牌校验（由 GitHub 服务端验证），可叠加本机口令与两步验证 MFA。</div>
+      <div class="row spread" style="margin-bottom:8px"><span class="small muted">当前身份</span><span class="small" id="sec-who">访客（只读）</span></div>
+      <div class="row spread edit-only" style="margin-bottom:8px"><span class="small muted">记住登录</span>
         <select id="sec-days" class="lb-month">
           <option value="1">仅 1 天</option>
           <option value="7">7 天</option>
           <option value="30">30 天</option>
         </select>
       </div>
-      <div class="row spread" style="margin-bottom:12px"><span class="small muted">本地口令</span><span class="small" id="sec-pin">未设置</span></div>
-      <div class="row spread" style="margin-bottom:12px"><span class="small muted">两步验证 MFA</span><span class="small" id="sec-mfa">未开启</span></div>
-      <div class="row" style="gap:10px">
+      <div class="row spread edit-only" style="margin-bottom:12px"><span class="small muted">本地口令</span><span class="small" id="sec-pin">未设置</span></div>
+      <div class="row spread edit-only" style="margin-bottom:12px"><span class="small muted">两步验证 MFA</span><span class="small" id="sec-mfa">未开启</span></div>
+      <div class="row edit-only" style="gap:10px">
         <button class="btn btn-line" id="sec-pin-btn" style="flex:1">设置 / 移除口令</button>
         <button class="btn btn-line" id="sec-mfa-btn" style="flex:1">开启两步验证</button>
         <button class="btn btn-danger" id="sec-logout" style="flex:1">退出登录</button>
       </div>
     </div>
-<div class="card">
+<div class="card edit-only">
       <div style="font-weight:800;margin-bottom:10px">示例数据</div>
       <button class="btn btn-danger btn-block" id="clear-sample">清空示例数据（打卡记录与周报）</button>
     </div>
-    <div class="card">
+    <div class="card edit-only">
       <div style="font-weight:800;margin-bottom:10px">清空全部</div>
       <div class="warn-box" style="margin-bottom:10px">此操作会删除学习主题、打卡记录、周报的全部数据，不可恢复。</div>
       <input id="clear-all-input" placeholder="输入「清空」后点击下方按钮" style="width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:11px;margin-bottom:10px">
@@ -448,8 +462,10 @@
     return "GitHub 接口错误（"+status+"）"+((j&&j.message)?("："+j.message):"");
   }
   function ghApi(method,url,body){
-    var cfg=readGhCfg();
-    var opt={method:method,headers:{"Accept":"application/vnd.github+json","Authorization":"Bearer "+(cfg?cfg.token:""),"Content-Type":"application/json"}};
+    var cfg=effectiveCfg();
+    var headers={"Accept":"application/vnd.github+json","Content-Type":"application/json"};
+    if(cfg&&cfg.token)headers.Authorization="Bearer "+cfg.token; // 访客匿名读取（公开仓库），不带令牌
+    var opt={method:method,headers:headers};
     if(body)opt.body=JSON.stringify(body);
     return fetch(url,opt).then(function(res){
       return res.json().catch(function(){return {};}).then(function(j){
@@ -458,7 +474,19 @@
       });
     });
   }
-  function ghUrl(){var c=readGhCfg();return "https://api.github.com/repos/"+encodeURIComponent(c.owner)+"/"+encodeURIComponent(c.repo)+"/contents/"+c.path.split("/").map(encodeURIComponent).join("/");}
+  function derivedCfg(){ // 从 GitHub Pages 地址推导数据仓库：<user>.github.io/<repo> → owner=user, repo=repo
+    var h=location.hostname,m=/^([^.]+)\.github\.io$/.exec(h);
+    if(!m)return null;
+    var segs=location.pathname.split("/").filter(Boolean);
+    var repo=segs.length?segs[0]:(m[1]+".github.io");
+    return {owner:m[1],repo:repo,branch:"main",path:"data/workspace.json",token:""};
+  }
+  function effectiveCfg(){ // 已保存配置优先；否则用从页面地址推导的配置（支持访客匿名只读）
+    var c=readGhCfg();
+    if(c&&c.owner&&c.repo)return c;
+    return derivedCfg()||{owner:"",repo:"",branch:"main",path:"data/workspace.json",token:""};
+  }
+  function ghUrl(){var c=effectiveCfg();return "https://api.github.com/repos/"+encodeURIComponent(c.owner)+"/"+encodeURIComponent(c.repo)+"/contents/"+c.path.split("/").map(encodeURIComponent).join("/");}
   function ghFetchRemote(){
     var c=readGhCfg();
     return ghApi("GET",ghUrl()+"?ref="+encodeURIComponent(c.branch||"main")).then(function(j){
@@ -506,22 +534,25 @@
     if(persistPromise)return persistPromise;
     persistPromise=new Promise(function(resolve,reject){
       persistTimer=setTimeout(function(){
-        var cfg=readGhCfg();
-        if(!cfg||!cfg.owner||!cfg.repo||!cfg.token){dirty=false;persistPromise=null;resolve();return;}
+        var cfg=effectiveCfg();
+        if(!canEdit()||!cfg||!cfg.owner||!cfg.repo||!cfg.token){dirty=false;persistPromise=null;resolve();return;}
         ghPush("sync: 学习目标管理台").then(function(){dirty=false;persistPromise=null;resolve();},function(e){persistPromise=null;reject(e);});
       },700);
     });
     return persistPromise;
   }
+  function editDenied(){return Promise.reject(new Error("只读模式：请先管理员登录"));}
   function makeShim(){
     return {
       query:function(o){var rows=(store[tblKey(o.databaseId)]||[]).slice();return Promise.resolve({results:rows,nextCursor:null,hasMore:false});},
       addRecord:function(o){
+        if(!canEdit())return editDenied();
         var t=tblKey(o.databaseId);var row=unwrapProps(o.properties);row._id=uid(t.charAt(0));
         var snap=store[t].slice();store[t].push(row);
         return persist().then(function(){return row;},function(e){store[t]=snap;throw e;});
       },
       updateRecord:function(o){
+        if(!canEdit())return editDenied();
         var t=tblKey(o.databaseId);var idx=-1,i;
         for(i=0;i<store[t].length;i++){if(store[t][i]._id===o.recordId){idx=i;break;}}
         if(idx<0)return Promise.reject(new Error("记录不存在或已被其他设备删除"));
@@ -532,6 +563,7 @@
         return persist().then(function(){return merged;},function(e){store[t]=snap;throw e;});
       },
       deleteRecord:function(o){
+        if(!canEdit())return editDenied();
         var t=tblKey(o.databaseId);var idx=-1,i;
         for(i=0;i<store[t].length;i++){if(store[t][i]._id===o.recordId){idx=i;break;}}
         if(idx<0)return Promise.resolve();
@@ -539,6 +571,7 @@
         return persist().then(function(){},function(e){store[t]=snap;throw e;});
       },
       deleteMany:function(o){
+        if(!canEdit())return editDenied();
         var t=tblKey(o.databaseId);var ids={};(o.recordIds||[]).forEach(function(x){ids[x]=true;});
         var keep=store[t].filter(function(r){return !ids[r._id];});
         if(keep.length===store[t].length)return Promise.resolve();
@@ -614,10 +647,26 @@
     if(Date.now()>u.until){clearUnlock();return false;}
     return true;
   }
+  /* 编辑权限 = 有效管理员会话 + 已配置令牌；访客默认只读 */
+  function canEdit(){
+    if(!isUnlocked())return false;
+    var cfg=readGhCfg();
+    return !!(cfg&&cfg.token);
+  }
+  function requireEdit(){ // 写操作统一入口拦截：未登录时唤起管理员登录
+    if(canEdit())return true;
+    toast("只读模式：该操作需要管理员登录","err");
+    showLock("");
+    return false;
+  }
+  function applyMode(){ // 根据权限切换只读/编辑 UI
+    document.body.classList.toggle("readonly",!canEdit());
+  }
+  function goLogin(){hideBanner();showLock("");}
   function showLock(errMsg){
     var el=$("lock");if(!el)return;
     el.classList.remove("hidden");
-    var cfg=readGhCfg()||{};
+    var cfg=readGhCfg()||derivedCfg()||{};
     if(cfg.owner)$("lk-owner").value=cfg.owner;
     if(cfg.repo)$("lk-repo").value=cfg.repo;
     $("lk-branch").value=cfg.branch||"main";
@@ -665,7 +714,7 @@
       function finish(){
         writeUnlock({login:login,until:Date.now()+sessDays()*DAY,at:Date.now()});
         btn.disabled=false;btn.textContent="验证并进入";
-        hideLock();renderMineSecurity();bootstrap();
+        hideLock();applyMode();renderMineSecurity();bootstrap();
       }
       if(mfaEnabled()){
         var code=$("lk-mfa")?$("lk-mfa").value:"";
@@ -691,24 +740,28 @@
     });
   }
   function logout(){
-    if(!confirm("退出登录后，本机将清除令牌与解锁状态，需要重新验证才能查看数据。确定退出？"))return;
+    if(!confirm("退出管理员登录后，本机将清除令牌与解锁状态，页面回到只读浏览模式。确定退出？"))return;
     clearUnlock();
-    try{localStorage.removeItem(GH_CFG_KEY);}catch(e){}
+    var cfg=readGhCfg();
+    if(cfg)writeGhCfg({owner:cfg.owner,repo:cfg.repo,branch:cfg.branch,path:cfg.path,token:""});
     try{localStorage.removeItem(GH_CACHE_KEY);}catch(e){}
     state.goals=[];state.records=[];state.weeks=[];state.loaded=false;
     store.goals=[];store.records=[];store.weeks=[];store.sha=null;
-    refreshAll();
-    showLock("");
+    hideLock();applyMode();renderMineSecurity();refreshAll();
+    bootstrap(); // 以访客身份匿名重新读取
   }
   function renderMineSecurity(){
     var u=readUnlock();
-    var whoEl=$("sec-who");if(whoEl)whoEl.textContent=u&&u.login?(u.login+"（会话至 "+new Date(u.until).toLocaleDateString("zh-CN")+"）"):"未登录";
+    var whoEl=$("sec-who");
+    if(whoEl)whoEl.textContent=(canEdit()&&u&&u.login)?(u.login+"（会话至 "+new Date(u.until).toLocaleDateString("zh-CN")+"）"):"访客（只读）";
     var pinEl=$("sec-pin");if(pinEl)pinEl.textContent=readPin()?"已设置":"未设置";
     var daysEl=$("sec-days");if(daysEl)daysEl.value=String(sessDays());
     var mfaEl=$("sec-mfa");if(mfaEl)mfaEl.textContent=mfaEnabled()?"已开启":"未开启";
     var mfaBtn=$("sec-mfa-btn");if(mfaBtn)mfaBtn.textContent=mfaEnabled()?"关闭两步验证":"开启两步验证";
+    var outBtn=$("sec-logout");if(outBtn)outBtn.textContent=canEdit()?"退出登录":"管理员登录";
   }
   function setupPin(){
+    if(!requireEdit())return;
     var cur=readPin();
     if(cur){
       if(!confirm("移除本机已设置的本地口令？"))return;
@@ -805,6 +858,7 @@
     };
   }
   function setupMfa(){
+    if(!requireEdit())return;
     if(!(window.crypto&&crypto.subtle)){toast("需通过 https 打开页面才能使用两步验证","err");return;}
     if(mfaEnabled()){
       var c=prompt("关闭两步验证：请输入验证器 App 当前的 6 位验证码");
@@ -842,6 +896,7 @@
     if(stateName==="err")lab.textContent="同步失败";
     else if(stateName==="load")lab.textContent="同步中…";
     else if(stateName==="local")lab.textContent="本地模式（未连接 GitHub）";
+    else if(stateName==="ro")lab.textContent="只读浏览（访客）";
     else lab.textContent="已同步到 GitHub";
     if(time)tm.textContent="最近同步："+time;
   }
@@ -883,6 +938,7 @@
     if(cfg.token)tk.placeholder="已保存（留空则沿用原令牌）";
   }
   function saveGhConfig(){
+    if(!requireEdit())return;
     var prev=readGhCfg()||{};
     var cfg={
       owner:$("gh-owner").value.trim(),
@@ -896,45 +952,65 @@
     toast("配置已保存，正在连接 GitHub…","ok");
     bootstrap();
   }
+  var pollLast=0;
   function pollRemote(){
-    var cfg=readGhCfg();
-    if(!cfg||!cfg.token||pollBusy||dirty)return;
+    var cfg=effectiveCfg();
+    if(!cfg||!cfg.owner||!cfg.repo||pollBusy||dirty)return;
+    if(!cfg.token&&Date.now()-pollLast<90000)return; // 匿名请求限流 60 次/小时：访客至少间隔 90 秒轮询
+    pollLast=Date.now();
     pollBusy=true;
     ghFetchRemote().then(function(remote){
       pollBusy=false;
       if(!remote||!remote.data)return;
       if(remote.sha===store.sha)return;
       setStoreFromRemote(remote);
-      markSynced();
+      if(canEdit())markSynced();else setSync("ro",new Date().toLocaleString("zh-CN",{hour12:false}));
       db.__emit({databaseIds:[DB_GOALS,DB_RECORDS,DB_WEEKS]});
     }).catch(function(){pollBusy=false;});
   }
   function bootstrap(){
-    var cfg=readGhCfg();
+    var cfg=effectiveCfg();
     setSync("load",null);
     state.failed=false;
-    fillGhForm(cfg||{});
-    if(!cfg||!cfg.owner||!cfg.repo||!cfg.token){
-      var cache=readLocalCache();
-      if(cache&&cache.goals&&cache.goals.length){store.goals=cache.goals||[];store.records=cache.records||[];store.weeks=cache.weeks||[];store.sha=null;}
-      else seedSample();
-      setSync("local",null);
-      showBanner("尚未连接 GitHub：数据暂存本机。到「我的」页填入仓库和令牌并保存，即可多电脑同步。",false,"去配置",function(){hideBanner();switchTab("mine");});
+    fillGhForm(readGhCfg()||{});
+    if(!cfg||!cfg.owner||!cfg.repo){ // 无法确定数据仓库（如本地直接打开文件）
+      var cache0=readLocalCache();
+      if(cache0&&cache0.goals&&cache0.goals.length){store.goals=cache0.goals||[];store.records=cache0.records||[];store.weeks=cache0.weeks||[];store.sha=null;}
+      else if(canEdit())seedSample();
+      else{store.goals=[];store.records=[];store.weeks=[];store.sha=null;}
+      setSync(canEdit()?"local":"ro",null);
+      if(canEdit())showBanner("尚未连接 GitHub：数据暂存本机。到「我的」页填入仓库和令牌并保存，即可多电脑同步。",false,"去配置",function(){hideBanner();switchTab("mine");});
+      else showBanner("只读模式：未确定数据仓库，显示本地缓存。",false,"管理员登录",goLogin);
       return applyStoreToState();
     }
     return ghFetchRemote().then(function(remote){
       if(remote&&remote.data){setStoreFromRemote(remote);return null;}
-      var cache=readLocalCache();
-      if(cache&&cache.goals&&cache.goals.length){store.goals=cache.goals||[];store.records=cache.records||[];store.weeks=cache.weeks||[];store.sha=null;}
-      else seedSample();
-      return ghPush("init: 学习目标管理台数据").then(function(){return null;});
-    }).then(function(){
-      markSynced();
-      hideBanner();
+      if(canEdit()){ // 管理员且远端无数据文件：初始化
+        var cache=readLocalCache();
+        if(cache&&cache.goals&&cache.goals.length){store.goals=cache.goals||[];store.records=cache.records||[];store.weeks=cache.weeks||[];store.sha=null;}
+        else seedSample();
+        return ghPush("init: 学习目标管理台数据").then(function(){return null;});
+      }
+      // 访客：远端无数据文件（或仓库私有导致 404）→ 展示空数据
+      store.goals=[];store.records=[];store.weeks=[];store.sha=null;
+      setSync("ro",null);
+      showBanner("只读模式：暂未读取到远端数据（数据文件尚未创建，或仓库为私有——访客只读需要仓库公开）。",false,"管理员登录",goLogin);
+      return "skip-sync";
+    }).then(function(skip){
+      if(skip!=="skip-sync"){markSynced();hideBanner();}
       return applyStoreToState();
     }).catch(function(err){
       state.failed=true;setSync("err",null);
-      showBanner("GitHub 读取失败："+(err&&err.message?err.message:"网络异常")+"。请检查配置和网络后点「重试」。",true);
+      if(!canEdit()){ // 访客兜底：优先本地缓存，避免白屏
+        var cache=readLocalCache();
+        if(cache&&cache.goals&&cache.goals.length){
+          store.goals=cache.goals||[];store.records=cache.records||[];store.weeks=cache.weeks||[];store.sha=null;
+          setSync("ro",null);hideBanner();return applyStoreToState();
+        }
+        store.goals=[];store.records=[];store.weeks=[];store.sha=null;
+        applyStoreToState();
+      }
+      showBanner("GitHub 读取失败："+(err&&err.message?err.message:"网络异常")+"。请检查配置和网络后点「重试」。",true,"重试",function(){hideBanner();bootstrap();});
     });
   }
 
@@ -1183,6 +1259,7 @@
     return wrap;
   }
   function doListCheckin(id,sel,dateStr,mins){
+    if(!requireEdit())return;
     var g=goalById(id);if(!g)return;
     var items=listOf(g);
     var retro=parseDate(dateStr)&&daysBetween(parseDate(dateStr),todayMid())<0;
@@ -1551,6 +1628,7 @@
     $("wk-plan").value=w?((w["下周预案"]||"")+""):"";
   }
   function saveWeek(){
+    if(!requireEdit())return;
     var ws=addDays(weekStart(todayMid()),state.weekCursor*7);
     var we=addDays(ws,6);
     var cur=weekStatsFor(ws,we);
@@ -1596,6 +1674,7 @@
 
   /* ---------- modal: goal edit/new ---------- */
   function openGoalModal(id){
+    if(!requireEdit())return;
     editingId=id||null;
     var g=id?goalById(id):null;
     var dr=g?null:readGoalDraft();
@@ -1672,6 +1751,7 @@
 
   /* ---------- actions ---------- */
   function doCheckin(id){
+    if(!requireEdit())return;
     var amt=num($("amt-"+id).value), mins=num($("min-"+id).value), dateStr=$("date-"+id).value;
     if(amt<=0){toast("请填写本次完成量","err");return;}
     var d=parseDate(dateStr);var retro=daysBetween(d,todayMid())<0;
@@ -1695,6 +1775,7 @@
     return db.deleteMany({databaseId:dbid,recordIds:ids});
   }
   function deleteGoal(id){
+    if(!requireEdit())return;
     if(!confirm("确定删除主题「"+(goalById(id)?goalById(id)["名称"]:"")+"」？其打卡记录也会一并删除，不可恢复。"))return;
     var recIds=goalRecords(id).map(function(r){return r._id;});
     delMany("recs",recIds)
@@ -1704,6 +1785,7 @@
       .catch(function(err){toast("删除失败："+(err&&err.message||"网络异常"),"err");});
   }
   function deleteRecord(rid){
+    if(!requireEdit())return;
     if(!confirm("删除这条打卡记录？"))return;
     db.deleteRecord({databaseId:"GQStptycSFER64kKNZGrtL",recordId:rid}).then(function(){
       toast("已删除记录","ok");return loadAll("recs");
@@ -1711,6 +1793,7 @@
       .catch(function(err){toast("删除失败："+(err&&err.message||"网络异常"),"err");});
   }
   function clearSample(){
+    if(!requireEdit())return;
     if(!confirm("清空示例数据：删除全部打卡记录与周报复盘（学习主题保留）。确定？"))return;
     var recIds=state.records.map(function(r){return r._id;});
     var wkIds=state.weeks.map(function(r){return r._id;});
@@ -1720,6 +1803,7 @@
       .catch(function(err){toast("清空失败："+(err&&err.message||"网络异常"),"err");});
   }
   function clearAll(){
+    if(!requireEdit())return;
     if($("clear-all-input").value.trim()!=="清空"){toast("请输入「清空」","err");return;}
     if(!confirm("确认清空全部数据（主题+记录+周报）？此操作不可恢复！"))return;
     var gIds=state.goals.map(function(r){return r._id;});
@@ -1778,11 +1862,14 @@
     $("wk-gen").onclick=genWeekText;
     $("clear-sample").onclick=clearSample;
     $("clear-all").onclick=clearAll;
-    // 登录门禁
+    // 登录门禁（管理员登录弹窗）
     $("lk-go").onclick=lockVerify;
+    $("lk-skip").onclick=hideLock; // 返回只读浏览
     $("lk-token").addEventListener("keydown",function(e){if(e.key==="Enter")lockVerify();});
     $("lk-pin").addEventListener("keydown",function(e){if(e.key==="Enter")lockVerify();});
-    $("sec-logout").onclick=logout;
+    $("lk-mfa").addEventListener("keydown",function(e){if(e.key==="Enter")lockVerify();});
+    $("ro-bar").onclick=goLogin; // 只读提示条 → 唤起登录
+    $("sec-logout").onclick=function(){if(canEdit())logout();else goLogin();};
     $("sec-pin-btn").onclick=setupPin;
     $("sec-mfa-btn").onclick=setupMfa;
     $("sec-days").onchange=function(){
@@ -1823,15 +1910,11 @@
   function init(){
     // 静态骨架已在 DOM 中；先绑定事件
     bind();
+    applyMode(); // 默认访客只读；有效管理员会话则解锁编辑
     renderMineSecurity();
-    if(isUnlocked()){
-      hideLock();
-      setInterval(pollRemote,30000); // 30s 轮询远端，其他设备的改动自动出现
-      bootstrap();
-    }else{
-      // 未登录：不发起任何数据请求，先锁屏
-      showLock("");
-    }
+    hideLock();
+    setInterval(pollRemote,30000);
+    bootstrap();
   }
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",init);
   else init();
