@@ -508,15 +508,7 @@
     var c=effectiveCfg();
     return "https://raw.githubusercontent.com/"+encodeURIComponent(c.owner)+"/"+encodeURIComponent(c.repo)+"/HEAD/"+c.path.split("/").map(encodeURIComponent).join("/");
   }
-  function ghFetchRemote(){
-    var c=effectiveCfg();
-    if(c&&c.token){ // 管理员：走 Contents API（能拿到 sha，推送时需要）
-      return ghApi("GET",ghUrl()).then(function(j){
-        var data={};try{data=JSON.parse(b64d(j.content||""))||{};}catch(e){data={};}
-        return {sha:j.sha,data:data};
-      }).catch(function(err){if(err&&err.status===404)return {sha:null,data:null};throw err;});
-    }
-    // 访客：raw CDN 读取（?t= 按分钟缓存穿透，保证 ~1 分钟内看到更新）
+  function ghRawFetch(){ // 访客：raw CDN 读取（?t= 按分钟缓存穿透，保证 ~1 分钟内看到更新）
     return fetch(ghRawUrl()+"?t="+Math.floor(Date.now()/60000)).then(function(res){
       if(res.status===404)return {sha:null,data:null};
       if(!res.ok)throw new Error("数据读取失败（"+res.status+"），请稍后重试");
@@ -528,6 +520,22 @@
       if(err&&err.message&&err.message.indexOf("数据读取失败")===0)throw err;
       throw new Error("网络异常，无法读取学习数据");
     });
+  }
+  function ghFetchRemote(){
+    var c=effectiveCfg();
+    if(c&&c.token){ // 管理员：走 Contents API（能拿到 sha，推送时需要）
+      return ghApi("GET",ghUrl()).then(function(j){
+        var data={};try{data=JSON.parse(b64d(j.content||""))||{};}catch(e){data={};}
+        return {sha:j.sha,data:data};
+      }).catch(function(err){
+        if(err&&err.status&&(err.status===401||err.status===403)&&!canEdit()){
+          return ghRawFetch(); // 本机令牌已失效且无编辑会话：自动降级为 CDN 只读，不再卡在 403
+        }
+        if(err&&err.status===404)return {sha:null,data:null};
+        throw err;
+      });
+    }
+    return ghRawFetch();
   }
   function setStoreFromRemote(remote){
     var d=remote&&remote.data?remote.data:{};
