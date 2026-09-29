@@ -277,6 +277,7 @@
       <div class="form-row hidden" id="lk-mfa-row"><label>动态验证码（验证器 App 6 位）</label><input id="lk-mfa" type="text" inputmode="numeric" maxlength="6" placeholder="000000" autocomplete="one-time-code"></div>
       <button class="btn btn-primary btn-block" id="lk-go">验证并进入</button>
       <div class="small" style="text-align:center;margin-top:10px"><a href="javascript:void(0)" id="lk-switch-pass" style="color:var(--purple);font-weight:700">使用登录密码</a></div>
+      <div class="small hidden" id="lk-clear-row" style="text-align:center;margin-top:6px"><a href="javascript:void(0)" id="lk-clear-token" style="color:var(--red)">清除本机保存的令牌（排查登录问题）</a></div>
     </div>
     <button class="btn btn-soft btn-block" id="lk-skip" style="margin-top:10px">只读浏览</button>
     <div class="lock-tip">令牌仅存在本机浏览器：首次登录填一次，之后重新验证只需本地口令和动态码，令牌留空即可。换浏览器/清除缓存才需重新获取：GitHub → Settings → Developer settings → Fine-grained tokens → 勾选该仓库 Contents 读写。</div>
@@ -469,8 +470,10 @@
   }
   function seedSample(){var s=makeSample();store.goals=s.goals;store.records=s.records;store.weeks=s.weeks;store.auth=null;store.sha=null;}
   function ghErrMsg(status,j){
+    var jm=((j&&j.message)||"").toLowerCase();
+    if(status===403&&jm.indexOf("rate limit")>=0)return "访问频率超限：GitHub 匿名访问每小时 60 次，请约 1 小时后再试，或登录管理员（令牌限额高得多）";
     if(status===401)return "令牌无效或已过期（401），请检查 Token";
-    if(status===403)return "没有权限或被限流（403），请确认令牌勾选了该仓库 Contents: Read and write";
+    if(status===403)return "没有权限（403）：本机保存的令牌可能已失效或缺少该仓库 Contents 读写权限";
     if(status===404)return "仓库、分支或文件路径不存在（404）";
     return "GitHub 接口错误（"+status+"）"+((j&&j.message)?("："+j.message):"");
   }
@@ -703,6 +706,8 @@
     $("lk-pass").value="";
     $("lk-pass-mfa").value="";
     $("lk-pass-mfa-row").classList.add("hidden");
+    var clearRow=$("lk-clear-row");
+    if(clearRow)clearRow.classList.toggle("hidden",!(cfg&&cfg.token));
     setLockErr(errMsg||"");
   }
   function hideLock(){var el=$("lock");if(el)el.classList.add("hidden");}
@@ -1099,7 +1104,7 @@
   function pollRemote(){
     var cfg=effectiveCfg();
     if(!cfg||!cfg.owner||!cfg.repo||pollBusy||dirty)return;
-    if(!cfg.token&&Date.now()-pollLast<90000)return; // 匿名请求限流 60 次/小时：访客至少间隔 90 秒轮询
+    if(!cfg.token&&Date.now()-pollLast<300000)return; // 匿名请求限流 60 次/小时：访客至少间隔 5 分钟轮询
     pollLast=Date.now();
     pollBusy=true;
     ghFetchRemote().then(function(remote){
@@ -1148,7 +1153,10 @@
         store.goals=[];store.records=[];store.weeks=[];store.auth=null;store.sha=null;
         applyStoreToState();
       }
-      showBanner("GitHub 读取失败："+(err&&err.message?err.message:"网络异常")+"。请检查配置和网络后点「重试」。",true,"重试",function(){hideBanner();bootstrap();});
+      showBanner("GitHub 读取失败："+(err&&err.message?err.message:"网络异常")+"。"+
+      ((readGhCfg()||{}).token
+        ?"本机保存的令牌可能已失效：点「管理员登录」→「改用令牌登录」输入新令牌覆盖，或清除本机令牌。"
+        :"若为匿名限流（每小时 60 次），请约 1 小时后再试，或登录管理员。"),true,"重试",function(){hideBanner();bootstrap();});
     });
   }
 
@@ -2005,6 +2013,15 @@
     $("lk-pass-go").onclick=lockVerifyPass;
     $("lk-switch-token").onclick=function(){$("lk-passmode").classList.add("hidden");$("lk-tokenmode").classList.remove("hidden");setLockErr("");};
     $("lk-switch-pass").onclick=function(){$("lk-tokenmode").classList.add("hidden");$("lk-passmode").classList.remove("hidden");setLockErr("");};
+    $("lk-clear-token").onclick=function(){
+      var c=readGhCfg();
+      if(!c||!c.token){toast("本机没有保存令牌","err");return;}
+      if(!confirm("清除本机保存的令牌？（仓库信息保留，下次登录需重新输入令牌）"))return;
+      writeGhCfg({owner:c.owner,repo:c.repo,branch:c.branch,path:c.path,token:""});
+      authKeyCacheClear();
+      toast("已清除本机令牌","ok");
+      showLock("");
+    };
     $("lk-pass").addEventListener("keydown",function(e){if(e.key==="Enter")lockVerifyPass();});
     $("lk-pass-mfa").addEventListener("keydown",function(e){if(e.key==="Enter")lockVerifyPass();});
     $("lk-skip").onclick=hideLock; // 返回只读浏览
