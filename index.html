@@ -257,21 +257,28 @@
 <div id="lock" class="hidden">
   <div class="lock-card">
     <div class="lock-logo"><svg viewBox="0 0 24 24" fill="none"><path d="M4 5h16v14H4z" stroke="#7C5CFF" stroke-width="2" stroke-linejoin="round"/><path d="M8 9h8M8 13h5" stroke="#9D7BFF" stroke-width="2" stroke-linecap="round"/></svg>管理员登录</div>
-    <div class="lock-desc">默认所有人可只读浏览（数据仓库需公开）。登录管理员后可打卡、新建和编辑——校验由 GitHub 服务端完成，可叠加本地口令与两步验证。</div>
+    <div class="lock-desc">默认所有人可只读浏览（数据仓库需公开）。登录管理员后可打卡、新建和编辑——支持「登录密码 + 动态码」或「GitHub 令牌」两种方式，校验由 GitHub 服务端完成。</div>
     <div id="lock-who" class="lock-who hidden"></div>
-    <div class="form-row"><label>GitHub 用户名 / 组织</label><input id="lk-owner" placeholder="如：yourname" autocomplete="username"></div>
-    <div class="form-row"><label>数据仓库名（建议私有）</label><input id="lk-repo" placeholder="如：my-data"></div>
-    <div class="form-2">
-      <div class="form-row"><label>分支</label><input id="lk-branch" placeholder="main"></div>
-      <div class="form-row"><label>文件路径</label><input id="lk-path" placeholder="data/workspace.json"></div>
+    <div id="lk-passmode" class="hidden">
+      <div class="form-row"><label>登录密码</label><input id="lk-pass" type="password" autocomplete="current-password"></div>
+      <div class="form-row hidden" id="lk-pass-mfa-row"><label>动态验证码（验证器 App 6 位）</label><input id="lk-pass-mfa" type="text" inputmode="numeric" maxlength="6" placeholder="000000" autocomplete="one-time-code"></div>
+      <button class="btn btn-primary btn-block" id="lk-pass-go">密码登录</button>
+      <div class="small" style="text-align:center;margin-top:10px"><a href="javascript:void(0)" id="lk-switch-token" style="color:var(--purple);font-weight:700">改用令牌登录</a></div>
     </div>
-    <div class="form-row"><label>Personal Access Token</label><input id="lk-token" type="password" placeholder="github_pat_… / ghp_…" autocomplete="current-password"></div>
-    <div class="form-row hidden" id="lk-pin-row"><label>本地口令（本机已设置）</label><input id="lk-pin" type="password" inputmode="numeric" placeholder="输入本地口令" autocomplete="off"></div>
-    <div class="form-row hidden" id="lk-mfa-row"><label>动态验证码（验证器 App 6 位）</label><input id="lk-mfa" type="text" inputmode="numeric" maxlength="6" placeholder="000000" autocomplete="one-time-code"></div>
-    <div class="row" style="gap:10px;margin-top:6px">
-      <button class="btn btn-primary" id="lk-go" style="flex:2">验证并进入</button>
-      <button class="btn btn-soft" id="lk-skip" style="flex:1">只读浏览</button>
+    <div id="lk-tokenmode" class="hidden">
+      <div class="form-row"><label>GitHub 用户名 / 组织</label><input id="lk-owner" placeholder="如：yourname" autocomplete="username"></div>
+      <div class="form-row"><label>数据仓库名</label><input id="lk-repo" placeholder="如：my-data"></div>
+      <div class="form-2">
+        <div class="form-row"><label>分支</label><input id="lk-branch" placeholder="main"></div>
+        <div class="form-row"><label>文件路径</label><input id="lk-path" placeholder="data/workspace.json"></div>
+      </div>
+      <div class="form-row"><label>Personal Access Token</label><input id="lk-token" type="password" placeholder="github_pat_… / ghp_…" autocomplete="current-password"></div>
+      <div class="form-row hidden" id="lk-pin-row"><label>本地口令（本机已设置）</label><input id="lk-pin" type="password" inputmode="numeric" placeholder="输入本地口令" autocomplete="off"></div>
+      <div class="form-row hidden" id="lk-mfa-row"><label>动态验证码（验证器 App 6 位）</label><input id="lk-mfa" type="text" inputmode="numeric" maxlength="6" placeholder="000000" autocomplete="one-time-code"></div>
+      <button class="btn btn-primary btn-block" id="lk-go">验证并进入</button>
+      <div class="small" style="text-align:center;margin-top:10px"><a href="javascript:void(0)" id="lk-switch-pass" style="color:var(--purple);font-weight:700">使用登录密码</a></div>
     </div>
+    <button class="btn btn-soft btn-block" id="lk-skip" style="margin-top:10px">只读浏览</button>
     <div class="lock-tip">令牌仅存在本机浏览器：首次登录填一次，之后重新验证只需本地口令和动态码，令牌留空即可。换浏览器/清除缓存才需重新获取：GitHub → Settings → Developer settings → Fine-grained tokens → 勾选该仓库 Contents 读写。</div>
     <div id="lock-err" class="lock-err hidden"></div>
   </div>
@@ -364,7 +371,7 @@
     </div>
         <div class="card">
       <div style="font-weight:800;margin-bottom:10px">登录与安全</div>
-      <div class="small muted" style="margin-bottom:10px">默认访客只读浏览。管理员登录需 GitHub 令牌校验（由 GitHub 服务端验证），可叠加本机口令与两步验证 MFA。</div>
+      <div class="small muted" style="margin-bottom:10px">默认访客只读浏览。推荐「设置登录密码 + 开启两步验证」——密码会把令牌加密存进仓库，之后任何设备都能用密码+动态码登录；也可随时改用令牌登录。</div>
       <div class="row spread" style="margin-bottom:8px"><span class="small muted">当前身份</span><span class="small" id="sec-who">访客（只读）</span></div>
       <div class="row spread edit-only" style="margin-bottom:8px"><span class="small muted">记住登录</span>
         <select id="sec-days" class="lb-month">
@@ -375,10 +382,14 @@
         </select>
       </div>
       <div class="row spread edit-only" style="margin-bottom:12px"><span class="small muted">本地口令</span><span class="small" id="sec-pin">未设置</span></div>
+      <div class="row spread edit-only" style="margin-bottom:8px"><span class="small muted">登录密码</span><span class="small" id="sec-pass">未设置</span></div>
       <div class="row spread edit-only" style="margin-bottom:12px"><span class="small muted">两步验证 MFA</span><span class="small" id="sec-mfa">未开启</span></div>
-      <div class="row edit-only" style="gap:10px">
-        <button class="btn btn-line" id="sec-pin-btn" style="flex:1">设置 / 移除口令</button>
+      <div class="row edit-only" style="gap:10px;margin-bottom:10px">
+        <button class="btn btn-primary" id="sec-pass-btn" style="flex:1">设置登录密码</button>
         <button class="btn btn-line" id="sec-mfa-btn" style="flex:1">开启两步验证</button>
+      </div>
+      <div class="row edit-only" style="gap:10px">
+        <button class="btn btn-line" id="sec-pin-btn" style="flex:1">本地口令（可选）</button>
         <button class="btn btn-danger" id="sec-logout" style="flex:1">退出登录</button>
       </div>
     </div>
@@ -418,7 +429,7 @@
 
   /* ---------- GitHub 存储层：数据整体存为仓库里的一个 JSON 文件 ---------- */
   var GH_CFG_KEY="wb_lg_gh_config",GH_CACHE_KEY="wb_lg_local_store";
-  var store={goals:[],records:[],weeks:[],sha:null};
+  var store={goals:[],records:[],weeks:[],auth:null,sha:null};
   var ghListener=null,persistTimer=null,persistPromise=null,dirty=false,pollBusy=false;
   function readGhCfg(){try{var s=localStorage.getItem(GH_CFG_KEY);return s?JSON.parse(s):null;}catch(e){return null;}}
   function writeGhCfg(c){try{localStorage.setItem(GH_CFG_KEY,JSON.stringify(c));}catch(e){}}
@@ -433,8 +444,9 @@
       }else row[k]=v;});
     return row;
   }
-  function cacheLocal(){try{localStorage.setItem(GH_CACHE_KEY,JSON.stringify({goals:store.goals,records:store.records,weeks:store.weeks}));}catch(e){}}
+  function cacheLocal(){try{localStorage.setItem(GH_CACHE_KEY,JSON.stringify({goals:store.goals,records:store.records,weeks:store.weeks,auth:store.auth||null}));}catch(e){}}
   function readLocalCache(){try{var s=localStorage.getItem(GH_CACHE_KEY);return s?JSON.parse(s):null;}catch(e){return null;}}
+  function restoreLocalCache(){var c=readLocalCache();if(c&&c.goals&&c.goals.length){store.goals=c.goals||[];store.records=c.records||[];store.weeks=c.weeks||[];store.auth=c.auth||null;store.sha=null;return true;}return false;}
   function makeSample(){
     var t=todayMid();
     function ds(n){return fmtDate(addDays(t,-n));}
@@ -455,7 +467,7 @@
     var weeks=[{_id:"sw1",周起始:fmtDate(addDays(weekStart(t),-7)),周结束:fmtDate(addDays(weekStart(t),-1)),保持:"每天通勤背单词稳定",问题:"周末容易断",尝试:"把任务拆到早上",下周预案:"周末只安排 30 分钟",投入量:163,打卡天数:4,分钟数:325}];
     return {goals:goals,records:recs,weeks:weeks};
   }
-  function seedSample(){var s=makeSample();store.goals=s.goals;store.records=s.records;store.weeks=s.weeks;store.sha=null;}
+  function seedSample(){var s=makeSample();store.goals=s.goals;store.records=s.records;store.weeks=s.weeks;store.auth=null;store.sha=null;}
   function ghErrMsg(status,j){
     if(status===401)return "令牌无效或已过期（401），请检查 Token";
     if(status===403)return "没有权限或被限流（403），请确认令牌勾选了该仓库 Contents: Read and write";
@@ -498,12 +510,13 @@
   function setStoreFromRemote(remote){
     var d=remote&&remote.data?remote.data:{};
     store.goals=d.goals||[];store.records=d.records||[];store.weeks=d.weeks||[];
+    store.auth=d.auth||null;
     store.sha=remote?remote.sha:null;
   }
   function markSynced(){state.lastSync=new Date();setSync("ok",state.lastSync.toLocaleString("zh-CN",{hour12:false}));}
   function ghDoPush(msg){
     var cfg=readGhCfg();
-    var payload=JSON.stringify({version:1,goals:store.goals,records:store.records,weeks:store.weeks});
+    var payload=JSON.stringify({version:1,goals:store.goals,records:store.records,weeks:store.weeks,auth:store.auth||null});
     var body={message:msg||"sync: 学习目标管理台",content:b64e(payload),branch:cfg.branch||"main"};
     if(store.sha)body.sha=store.sha;
     return ghApi("PUT",ghUrl(),body).then(function(j){
@@ -664,7 +677,7 @@
     document.body.classList.toggle("readonly",!canEdit());
   }
   function goLogin(){hideBanner();showLock("");}
-  function showLock(errMsg){
+  function showLock(errMsg,forceMode){
     var el=$("lock");if(!el)return;
     el.classList.remove("hidden");
     var cfg=readGhCfg()||derivedCfg()||{};
@@ -683,6 +696,13 @@
     var mfaRow=$("lk-mfa-row");
     if(mfaRow){if(mfaEnabled())mfaRow.classList.remove("hidden");else mfaRow.classList.add("hidden");}
     var mfaIn=$("lk-mfa");if(mfaIn)mfaIn.value="";
+    // 登录方式：默认优先"登录密码"（已设置时），可切换令牌登录
+    var passMode=(forceMode==="token")?false:((forceMode==="pass")?true:authHasPassword());
+    $("lk-passmode").classList.toggle("hidden",!passMode);
+    $("lk-tokenmode").classList.toggle("hidden",passMode);
+    $("lk-pass").value="";
+    $("lk-pass-mfa").value="";
+    $("lk-pass-mfa-row").classList.add("hidden");
     setLockErr(errMsg||"");
   }
   function hideLock(){var el=$("lock");if(el)el.classList.add("hidden");}
@@ -716,7 +736,9 @@
       function finish(){
         writeUnlock({login:login,until:Date.now()+sessDays()*DAY,at:Date.now()});
         btn.disabled=false;btn.textContent="验证并进入";
-        hideLock();applyMode();renderMineSecurity();bootstrap();
+        hideLock();applyMode();renderMineSecurity();
+        authSync().catch(function(){}); // 令牌可能更新，重新加密同步登录密码数据
+        bootstrap();
       }
       if(mfaEnabled()){
         var code=$("lk-mfa")?$("lk-mfa").value:"";
@@ -744,6 +766,7 @@
   function logout(){
     if(!confirm("退出管理员登录后，本机将清除令牌与解锁状态，页面回到只读浏览模式。确定退出？"))return;
     clearUnlock();
+    authKeyCacheClear();
     var cfg=readGhCfg();
     if(cfg)writeGhCfg({owner:cfg.owner,repo:cfg.repo,branch:cfg.branch,path:cfg.path,token:""});
     try{localStorage.removeItem(GH_CACHE_KEY);}catch(e){}
@@ -760,6 +783,8 @@
     var daysEl=$("sec-days");if(daysEl)daysEl.value=String(sessDays());
     var mfaEl=$("sec-mfa");if(mfaEl)mfaEl.textContent=mfaEnabled()?"已开启":"未开启";
     var mfaBtn=$("sec-mfa-btn");if(mfaBtn)mfaBtn.textContent=mfaEnabled()?"关闭两步验证":"开启两步验证";
+    var passEl=$("sec-pass");if(passEl)passEl.textContent=authHasPassword()?"已设置":"未设置";
+    var passBtn=$("sec-pass-btn");if(passBtn)passBtn.textContent=authHasPassword()?"更换 / 移除登录密码":"设置登录密码";
     var outBtn=$("sec-logout");if(outBtn)outBtn.textContent=canEdit()?"退出登录":"管理员登录";
   }
   function setupPin(){
@@ -830,8 +855,8 @@
     var c=Math.floor(Math.floor(Date.now()/1000)/30);
     return Promise.all([totpAt(secretB32,c-1),totpAt(secretB32,c),totpAt(secretB32,c+1)]);
   }
-  function mfaCheckInput(input){
-    var sec=readMfa();if(!sec)return Promise.resolve(true);
+  function mfaCheckInput(input,secretB32){
+    var sec=(arguments.length>1)?secretB32:readMfa();if(!sec)return Promise.resolve(true);
     var v=String(input||"").replace(/\D/g,"");
     if(v.length!==6)return Promise.resolve(false);
     return totpWindow(sec).then(function(arr){return arr.indexOf(v)>=0;});
@@ -855,7 +880,7 @@
     $("mfa-ok").onclick=function(){
       mfaCheckInput($("mfa-code").value).then(function(ok){
         if(!ok){toast("验证码不正确，请重看 App 上的数字","err");return;}
-        writeMfa(secret);mfaResetFail();closeModal();toast("两步验证已开启","ok");renderMineSecurity();
+        writeMfa(secret);mfaResetFail();closeModal();toast("两步验证已开启","ok");renderMineSecurity();authSync().catch(function(){});
       }).catch(function(e){toast("校验失败："+(e&&e.message||"环境不支持"),"err");});
     };
   }
@@ -867,7 +892,7 @@
       if(c===null)return;
       mfaCheckInput(c).then(function(ok){
         if(!ok){toast("验证码不正确","err");return;}
-        writeMfa("");mfaResetFail();toast("已关闭两步验证","ok");renderMineSecurity();
+        writeMfa("");mfaResetFail();toast("已关闭两步验证","ok");renderMineSecurity();authSync().catch(function(){});
       }).catch(function(){toast("校验失败","err");});
       return;
     }
@@ -875,6 +900,121 @@
     if(window.crypto&&crypto.getRandomValues)crypto.getRandomValues(bytes);
     else{for(var i=0;i<20;i++)bytes[i]=Math.floor(Math.random()*256);}
     openMfaModal(bytesToB32(bytes));
+  }
+  /* ---------- 登录密码：令牌+MFA密钥以 AES-GCM 加密存入仓库 JSON，跨设备"密码+动态码"登录 ---------- */
+  var AUTH_ITER=310000,AUTH_KEYCACHE="wb_lg_auth_key";
+  function b64ToBytes(b){var s=atob(b),out=[],i;for(i=0;i<s.length;i++)out.push(s.charCodeAt(i));return new Uint8Array(out);}
+  function bytesToB64(u8){var s="",i;for(i=0;i<u8.length;i++)s+=String.fromCharCode(u8[i]);return btoa(s);}
+  function deriveAuthBits(password,saltBytes,iter){
+    return crypto.subtle.importKey("raw",new TextEncoder().encode(password),"PBKDF2",false,["deriveBits"])
+      .then(function(k){return crypto.subtle.deriveBits({name:"PBKDF2",hash:"SHA-256",salt:saltBytes,iterations:iter},k,256);});
+  }
+  function importAesKey(rawBits){return crypto.subtle.importKey("raw",rawBits,{name:"AES-GCM"},false,["encrypt","decrypt"]);}
+  function aesEncrypt(key,obj){
+    var iv=crypto.getRandomValues(new Uint8Array(12));
+    return crypto.subtle.encrypt({name:"AES-GCM",iv:iv},key,new TextEncoder().encode(JSON.stringify(obj)))
+      .then(function(ct){return {iv:bytesToB64(iv),data:bytesToB64(new Uint8Array(ct))};});
+  }
+  function aesDecrypt(key,ivB64,dataB64){
+    return crypto.subtle.decrypt({name:"AES-GCM",iv:b64ToBytes(ivB64)},key,b64ToBytes(dataB64))
+      .then(function(pt){return JSON.parse(new TextDecoder().decode(pt));});
+  }
+  function makeAuthBlob(password,payload){ // 返回 {blob,bits}，bits 供本机缓存（等价于本机已有明文令牌的安全性）
+    var saltBytes=crypto.getRandomValues(new Uint8Array(16));
+    return deriveAuthBits(password,saltBytes,AUTH_ITER).then(function(bits){
+      return importAesKey(bits).then(function(key){
+        return aesEncrypt(key,payload).then(function(enc){
+          return {bits:new Uint8Array(bits),blob:{v:1,kdf:"PBKDF2-SHA256",iter:AUTH_ITER,salt:bytesToB64(saltBytes),enc:enc}};
+        });
+      });
+    });
+  }
+  function decryptAuthBlob(password){
+    var blob=store.auth;
+    if(!blob||!blob.enc||!blob.salt)return Promise.reject(new Error("未设置登录密码"));
+    return deriveAuthBits(password,b64ToBytes(blob.salt),blob.iter||AUTH_ITER)
+      .then(importAesKey)
+      .then(function(key){return aesDecrypt(key,blob.enc.iv,blob.enc.data);});
+  }
+  function authKeyCacheGet(){try{var s=localStorage.getItem(AUTH_KEYCACHE);return s?b64ToBytes(s):null;}catch(e){return null;}}
+  function authKeyCacheSet(u8){try{localStorage.setItem(AUTH_KEYCACHE,bytesToB64(u8));}catch(e){}}
+  function authKeyCacheClear(){try{localStorage.removeItem(AUTH_KEYCACHE);}catch(e){}}
+  function authSync(){ // 令牌/MFA 变更后，用本机缓存的密钥把最新内容重新加密进 store.auth（盐不变）
+    var blob=store.auth,bits=authKeyCacheGet();
+    if(!blob||!blob.enc||!bits)return Promise.resolve(false);
+    return importAesKey(bits).then(function(key){
+      return aesEncrypt(key,{token:(readGhCfg()||{}).token||"",mfa:readMfa()}).then(function(enc){
+        store.auth=Object.assign({},blob,{enc:enc});
+        return persist().then(function(){return true;});
+      });
+    }).catch(function(){return false;});
+  }
+  function authHasPassword(){return !!(store.auth&&store.auth.enc&&store.auth.salt);}
+
+  function lockVerifyPass(){
+    var pw=$("lk-pass").value,blob=store.auth;
+    if(!authHasPassword()){setLockErr("未设置登录密码，请改用令牌登录");return;}
+    if(!pw){setLockErr("请输入登录密码");return;}
+    var btn=$("lk-pass-go");btn.disabled=true;btn.textContent="验证中…";setLockErr("");
+    decryptAuthBlob(pw).then(function(payload){ // 密码正确（GCM 校验通过）
+      var mfaSecret=(payload&&payload.mfa)||"";
+      function finish2(){
+        var cfg=effectiveCfg();
+        writeGhCfg({owner:cfg.owner,repo:cfg.repo,branch:cfg.branch||"main",path:cfg.path||"data/workspace.json",token:(payload&&payload.token)||""});
+        if(mfaSecret)writeMfa(mfaSecret);
+        var bits=authKeyCacheGet();
+        writeUnlock({login:"admin",until:Date.now()+sessDays()*DAY,at:Date.now()});
+        btn.disabled=false;btn.textContent="密码登录";
+        hideLock();applyMode();renderMineSecurity();bootstrap();
+      }
+      if(mfaSecret){
+        var mfaRow=$("lk-pass-mfa-row");
+        var code=(mfaRow&&!mfaRow.classList.contains("hidden"))?$("lk-pass-mfa").value:"";
+        if(!code){mfaRow.classList.remove("hidden");$("lk-pass-mfa").focus();btn.disabled=false;btn.textContent="密码登录";setLockErr("密码正确，请输入验证器上的 6 位动态码");return;}
+        if(mfaLocked()){setLockErr("动态验证码错误次数过多，请 1 分钟后再试");btn.disabled=false;btn.textContent="密码登录";return;}
+        mfaCheckInput(code,mfaSecret).then(function(ok){
+          if(!ok){var n=mfaNoteFail();btn.disabled=false;btn.textContent="密码登录";
+            setLockErr(n>=5?"动态验证码错误次数过多，已锁定 1 分钟":"动态验证码不正确（已错误 "+n+" 次，5 次后锁定 1 分钟）");return;}
+          mfaResetFail();finish2();
+        }).catch(function(){btn.disabled=false;btn.textContent="密码登录";setLockErr("校验失败：环境不支持");});
+      }else finish2();
+    }).catch(function(){ // 解密失败 = 密码错误
+      btn.disabled=false;btn.textContent="密码登录";
+      setLockErr("登录密码不正确");
+    });
+  }
+  function setupLoginPassword(){
+    if(!requireEdit())return;
+    if(!(window.crypto&&crypto.subtle)){toast("需通过 https 打开页面才能设置登录密码","err");return;}
+    var cfg=readGhCfg()||{};
+    if(!cfg.token){toast("请先配置 GitHub 令牌","err");return;}
+    var has=authHasPassword();
+    var chain=Promise.resolve({token:cfg.token,mfa:readMfa()});
+    if(has){
+      var cur=prompt("已设置过登录密码。请输入当前密码以验证：");
+      if(cur===null)return;
+      chain=decryptAuthBlob(cur);
+    }
+    chain.then(function(payload){
+      var np=prompt(has?"输入新登录密码（至少 10 位；留空并确定 = 移除密码登录）：":"设置登录密码（至少 10 位，用于任何设备上「密码+动态码」登录）：");
+      if(np===null)return;
+      np=String(np);
+      if(!np){
+        if(!has)return;
+        if(!confirm("确定移除登录密码？之后任何设备都只能用令牌登录。"))return;
+        store.auth=null;authKeyCacheClear();persist();renderMineSecurity();
+        toast("已移除登录密码","ok");return;
+      }
+      if(np.length<10){toast("密码至少 10 位（建议短语+数字，如 study-2026-js!）","err");return;}
+      var np2=prompt("再输入一次确认：");
+      if(np2===null)return;
+      if(np2!==np){toast("两次输入不一致","err");return;}
+      makeAuthBlob(np,payload).then(function(r){
+        store.auth=r.blob;authKeyCacheSet(r.bits);persist();
+        renderMineSecurity();
+        toast("登录密码已保存（令牌已加密同步进仓库，可跨设备密码登录）","ok");
+      }).catch(function(e){toast("保存失败："+(e&&e.message||"环境不支持"),"err");});
+    }).catch(function(e){toast((e&&e.message)||"当前密码不正确","err");});
   }
   function todayMonth(){return fmtDate(todayMid()).slice(0,7);}
 
@@ -952,6 +1092,7 @@
     if(!cfg.owner||!cfg.repo||!cfg.token){toast("请填写用户名、仓库名和令牌","err");return;}
     writeGhCfg(cfg);
     toast("配置已保存，正在连接 GitHub…","ok");
+    authSync().catch(function(){});
     bootstrap();
   }
   var pollLast=0;
@@ -976,10 +1117,11 @@
     state.failed=false;
     fillGhForm(readGhCfg()||{});
     if(!cfg||!cfg.owner||!cfg.repo){ // 无法确定数据仓库（如本地直接打开文件）
-      var cache0=readLocalCache();
-      if(cache0&&cache0.goals&&cache0.goals.length){store.goals=cache0.goals||[];store.records=cache0.records||[];store.weeks=cache0.weeks||[];store.sha=null;}
-      else if(canEdit())seedSample();
-      else{store.goals=[];store.records=[];store.weeks=[];store.sha=null;}
+      if(!restoreLocalCache()){
+        if(canEdit())seedSample();
+        else{store.goals=[];store.records=[];store.weeks=[];store.auth=null;}
+        store.sha=null;
+      }
       setSync(canEdit()?"local":"ro",null);
       if(canEdit())showBanner("尚未连接 GitHub：数据暂存本机。到「我的」页填入仓库和令牌并保存，即可多电脑同步。",false,"去配置",function(){hideBanner();switchTab("mine");});
       else showBanner("只读模式：未确定数据仓库，显示本地缓存。",false,"管理员登录",goLogin);
@@ -988,13 +1130,11 @@
     return ghFetchRemote().then(function(remote){
       if(remote&&remote.data){setStoreFromRemote(remote);return null;}
       if(canEdit()){ // 管理员且远端无数据文件：初始化
-        var cache=readLocalCache();
-        if(cache&&cache.goals&&cache.goals.length){store.goals=cache.goals||[];store.records=cache.records||[];store.weeks=cache.weeks||[];store.sha=null;}
-        else seedSample();
+        if(!restoreLocalCache())seedSample();
         return ghPush("init: 学习目标管理台数据").then(function(){return null;});
       }
       // 访客：远端无数据文件（或仓库私有导致 404）→ 展示空数据
-      store.goals=[];store.records=[];store.weeks=[];store.sha=null;
+      store.goals=[];store.records=[];store.weeks=[];store.auth=null;store.sha=null;
       setSync("ro",null);
       showBanner("只读模式：暂未读取到远端数据（数据文件尚未创建，或仓库为私有——访客只读需要仓库公开）。",false,"管理员登录",goLogin);
       return "skip-sync";
@@ -1004,12 +1144,8 @@
     }).catch(function(err){
       state.failed=true;setSync("err",null);
       if(!canEdit()){ // 访客兜底：优先本地缓存，避免白屏
-        var cache=readLocalCache();
-        if(cache&&cache.goals&&cache.goals.length){
-          store.goals=cache.goals||[];store.records=cache.records||[];store.weeks=cache.weeks||[];store.sha=null;
-          setSync("ro",null);hideBanner();return applyStoreToState();
-        }
-        store.goals=[];store.records=[];store.weeks=[];store.sha=null;
+        if(restoreLocalCache()){setSync("ro",null);hideBanner();return applyStoreToState();}
+        store.goals=[];store.records=[];store.weeks=[];store.auth=null;store.sha=null;
         applyStoreToState();
       }
       showBanner("GitHub 读取失败："+(err&&err.message?err.message:"网络异常")+"。请检查配置和网络后点「重试」。",true,"重试",function(){hideBanner();bootstrap();});
@@ -1866,12 +2002,18 @@
     $("clear-all").onclick=clearAll;
     // 登录门禁（管理员登录弹窗）
     $("lk-go").onclick=lockVerify;
+    $("lk-pass-go").onclick=lockVerifyPass;
+    $("lk-switch-token").onclick=function(){$("lk-passmode").classList.add("hidden");$("lk-tokenmode").classList.remove("hidden");setLockErr("");};
+    $("lk-switch-pass").onclick=function(){$("lk-tokenmode").classList.add("hidden");$("lk-passmode").classList.remove("hidden");setLockErr("");};
+    $("lk-pass").addEventListener("keydown",function(e){if(e.key==="Enter")lockVerifyPass();});
+    $("lk-pass-mfa").addEventListener("keydown",function(e){if(e.key==="Enter")lockVerifyPass();});
     $("lk-skip").onclick=hideLock; // 返回只读浏览
     $("lk-token").addEventListener("keydown",function(e){if(e.key==="Enter")lockVerify();});
     $("lk-pin").addEventListener("keydown",function(e){if(e.key==="Enter")lockVerify();});
     $("lk-mfa").addEventListener("keydown",function(e){if(e.key==="Enter")lockVerify();});
     $("ro-bar").onclick=goLogin; // 只读提示条 → 唤起登录
     $("sec-logout").onclick=function(){if(canEdit())logout();else goLogin();};
+    $("sec-pass-btn").onclick=setupLoginPassword;
     $("sec-pin-btn").onclick=setupPin;
     $("sec-mfa-btn").onclick=setupMfa;
     $("sec-days").onchange=function(){
