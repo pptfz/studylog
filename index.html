@@ -5,6 +5,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>学习记录台（GitHub Pages 同步版）</title>
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 <style>
   :root{
     --bg:#F4F6FB; --card:#FFFFFF; --line:#ECEEF5;
@@ -898,7 +899,8 @@
     var uri="otpauth://totp/"+encodeURIComponent(acct)+"?secret="+secret+"&issuer="+encodeURIComponent(acct)+"&algorithm=SHA1&digits=6&period=30";
     var html='<div class="mask" id="mask"><div class="modal">'+
       '<h3>开启两步验证</h3>'+
-      '<div class="small muted" style="margin-bottom:10px">在验证器 App（Google / 微软 Authenticator、1Password 等）选择「手动输入密钥」，账户名随意，密钥填下面这串：</div>'+
+      '<div id="mfa-qr" style="display:flex;justify-content:center;margin-bottom:10px;min-height:160px;align-items:center" class="small muted">'+(window.QRCode?'生成二维码中…':'（二维码库未加载，用下面的手动输入方式）')+'</div>'+
+      '<div class="small muted" style="margin-bottom:10px">用验证器 App（Google / 微软 Authenticator、1Password 等）扫码添加；扫不了就选「手动输入密钥」，密钥填下面这串：</div>'+
       '<div style="font-family:monospace;font-size:15px;background:var(--bg);border-radius:10px;padding:10px;letter-spacing:1px;word-break:break-all" id="mfa-secret">'+esc(secret)+'</div>'+
       '<div class="small muted" style="margin:10px 0 4px">也可以复制这段 URI（部分 App 支持粘贴导入）：</div>'+
       '<textarea id="mfa-uri" style="width:100%;min-height:56px;font-size:12px">'+esc(uri)+'</textarea>'+
@@ -907,6 +909,10 @@
       '</div></div>';
     document.body.insertAdjacentHTML("beforeend",html);
     var mask=$("mask");
+    if(window.QRCode){
+      try{new QRCode($("mfa-qr"),{text:uri,width:170,height:170,correctLevel:QRCode.CorrectLevel.M});}
+      catch(e){$("mfa-qr").textContent="二维码生成失败，请用下面的手动输入方式";}
+    }
     $("mfa-cancel").onclick=closeModal;
     mask.onclick=function(e){if(e.target===mask)closeModal();};
     $("mfa-ok").onclick=function(){
