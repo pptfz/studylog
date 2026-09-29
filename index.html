@@ -251,11 +251,14 @@
   body.readonly .edit-only{display:none!important}
   body.readonly .ci-form,body.readonly .ci-actions,body.readonly .rec-del,body.readonly .qmark{display:none!important}
   body.readonly #tab-week textarea{pointer-events:none;background:var(--bg)}
-  #ro-bar{display:none;position:fixed;left:0;right:0;top:0;z-index:60;background:var(--purpleSoft);color:var(--purple);
-    font-size:13px;font-weight:700;padding:9px 14px;text-align:center;cursor:pointer;box-shadow:0 1px 0 var(--line)}
+  #ro-bar{display:none;position:fixed;left:0;right:0;top:0;z-index:60;height:36px;line-height:36px;background:var(--purpleSoft);color:var(--purple);
+    font-size:13px;font-weight:700;padding:0 14px;text-align:center;cursor:pointer;box-shadow:0 1px 0 var(--line)}
   body.readonly #ro-bar{display:block}
   body.readonly .main{padding-top:52px}
-  @media (min-width:1024px){body.readonly .main{padding-top:60px}}
+  @media (min-width:1024px){
+    body.readonly .main{padding-top:52px}
+    body.readonly .nav{top:36px;height:calc(100vh - 36px)}
+  }
 </style>
 </head>
 <body>
