@@ -828,11 +828,14 @@
     });
   }
   function gateDef(){
-    var D={pass:"HLX666",seq:["g1","gand","g2"]}; // 默认：厚礼蟹→and→王德发
+    var D={pass:"HLX666",seq:["蟹","d","发"]}; // 默认：蟹→d→发（单字符）
+    var LEG={"g1":"蟹","gand":"d","g2":"发"}; // 旧版整词顺序迁移
+    var CH="厚礼蟹and王德发";
     var g=store.gate;
     if(g&&g.pass&&typeof g.pass==="string"&&Array.isArray(g.seq)){
-      var ok=g.seq.filter(function(x){return x==="g1"||x==="gand"||x==="g2";});
-      if(ok.length===g.seq.length&&ok.length>=2&&ok.length<=6)return {pass:g.pass,seq:ok};
+      var ok=g.seq.map(function(x){return (typeof x==="string"&&LEG[x])?LEG[x]:x;});
+      ok=ok.filter(function(x){return typeof x==="string"&&x.length===1&&CH.indexOf(x)>=0;});
+      if(ok.length===g.seq.length&&ok.length>=2&&ok.length<=9)return {pass:g.pass,seq:ok};
     }
     return D;
   }
@@ -850,7 +853,8 @@
     if(gateEl){
       var gd=gateDef();
       var custom=store.gate&&store.gate.pass&&store.gate.seq;
-      gateEl.textContent=gd.pass+" · "+(custom&&store.gate.seq.join()!=="g1,gand,g2"?("自定义 "+gd.seq.length+" 步"):"默认顺序");
+      var isDef=gd.seq.join("")==="蟹d发";
+      gateEl.textContent=gd.pass+" · "+(custom&&!isDef?("自定义「"+gd.seq.join("")+"」"):"默认顺序");
     }
     var outBtn=$("sec-logout");if(outBtn)outBtn.textContent=canEdit()?"退出登录":"管理员登录";
   }
@@ -2224,27 +2228,36 @@
       document.addEventListener("keydown",keydown);
     }
     (function gateInit(){
-      var names=["g1","gand","g2"];
       var brands=document.querySelectorAll(".brand");
       for(var bi=0;bi<brands.length;bi++){
         (function(brand){
-          for(var i=0;i<names.length;i++){
-            (function(id){
-              var el=brand.querySelector(".gname."+id);
-              if(!el)return;
-              el.addEventListener("click",function(e){
-                e.stopPropagation();
-                if(canEdit())return;
-                var seq=gateDef().seq;
-                if(seq[gateStep]!==id){gateReset();return;}
-                gateStep++;
-                if(gateTimer)clearTimeout(gateTimer);
-                gateTimer=setTimeout(gateReset,GATE_WINDOW);
-                if(gateStep===seq.length)gateOpen();
-              });
-            })(names[i]);
+          var gn=brand.querySelectorAll(".gname");
+          for(var gi=0;gi<gn.length;gi++){
+            (function(el){
+              if(el.getAttribute("data-split"))return;
+              el.setAttribute("data-split","1");
+              var txt=el.textContent,html="";
+              for(var i=0;i<txt.length;i++){var ch=txt.charAt(i);html+='<span class="gch" data-ch="'+ch+'">'+ch+'</span>';}
+              el.innerHTML=html;
+            })(gn[gi]);
           }
         })(brands[bi]);
+      }
+      var chars=document.querySelectorAll(".brand .gch");
+      for(var ci=0;ci<chars.length;ci++){
+        (function(el){
+          el.addEventListener("click",function(e){
+            e.stopPropagation();
+            if(canEdit())return;
+            var ch=el.getAttribute("data-ch");
+            var seq=gateDef().seq;
+            if(seq[gateStep]!==ch){gateReset();return;}
+            gateStep++;
+            if(gateTimer)clearTimeout(gateTimer);
+            gateTimer=setTimeout(gateReset,GATE_WINDOW);
+            if(gateStep===seq.length)gateOpen();
+          });
+        })(chars[ci]);
       }
     })();
     function gateEnsure(){
@@ -2272,18 +2285,18 @@
       var bar=document.createElement("div");
       bar.id="gate-rec";
       bar.style.cssText="position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:120;display:flex;gap:10px;align-items:center;background:var(--purpleSoft);color:var(--purple);font-size:13px;font-weight:700;padding:10px 14px;border-radius:14px;box-shadow:0 6px 24px rgba(0,0,0,.15);white-space:nowrap";
-      bar.innerHTML='<span id="gate-rec-tip">录制中：依次点击品牌字（至少 2 步，至多 6 步）· 已录 0 步</span>'+
+      bar.innerHTML='<span id="gate-rec-tip">录制中：依次点击品牌单字（至少 2 步，至多 9 步）· 已录 0 步</span>'+
         '<button class="btn btn-primary" id="gate-rec-done" style="padding:6px 14px">完成</button>'+
         '<button class="btn btn-line" id="gate-rec-cancel" style="padding:6px 14px">取消</button>';
       document.body.appendChild(bar);
-      function tip(){var t=document.getElementById("gate-rec-tip");if(t)t.textContent="录制中：依次点击品牌字（至少 2 步，至多 6 步）· 已录 "+steps.length+" 步";}
+      function tip(){var t=document.getElementById("gate-rec-tip");if(t)t.textContent="录制中：依次点击品牌单字（至少 2 步，至多 9 步）· 已录 "+steps.length+" 步";}
       function onRec(e){
-        var el=e.target.closest?e.target.closest(".gname"):null;
+        var el=e.target.closest?e.target.closest(".gch"):null;
         if(!el)return;
-        var id=el.classList.contains("g1")?"g1":(el.classList.contains("gand")?"gand":(el.classList.contains("g2")?"g2":null));
-        if(!id)return;
-        if(steps.length>=6){toast("最多 6 步，点「完成」结束录制","err");return;}
-        steps.push(id);tip();
+        var ch=el.getAttribute("data-ch");
+        if(!ch)return;
+        if(steps.length>=9){toast("最多 9 步，点「完成」结束录制","err");return;}
+        steps.push(ch);tip();
       }
       function cleanup(){document.removeEventListener("click",onRec,true);if(bar.parentNode)bar.parentNode.removeChild(bar);}
       document.addEventListener("click",onRec,true);
