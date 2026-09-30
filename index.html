@@ -399,6 +399,11 @@
         <button class="btn btn-primary" id="sec-pass-btn" style="flex:1">设置登录密码</button>
         <button class="btn btn-line" id="sec-mfa-btn" style="flex:1">开启两步验证</button>
       </div>
+      <div class="row spread edit-only" style="margin-bottom:8px"><span class="small muted">秘密通道</span><span class="small" id="sec-gate">默认</span></div>
+      <div class="row edit-only" style="gap:10px;margin-bottom:12px">
+        <button class="btn btn-line" id="sec-gate-pass" style="flex:1">改通关密码</button>
+        <button class="btn btn-line" id="sec-gate-seq" style="flex:1">录点击顺序</button>
+      </div>
       <div class="row edit-only" style="gap:10px">
         <button class="btn btn-line" id="sec-pin-btn" style="flex:1">本地口令（可选）</button>
         <button class="btn btn-danger" id="sec-logout" style="flex:1">退出登录</button>
@@ -455,9 +460,9 @@
       }else row[k]=v;});
     return row;
   }
-  function cacheLocal(){try{localStorage.setItem(GH_CACHE_KEY,JSON.stringify({goals:store.goals,records:store.records,weeks:store.weeks,auth:store.auth||null}));}catch(e){}}
+  function cacheLocal(){try{localStorage.setItem(GH_CACHE_KEY,JSON.stringify({goals:store.goals,records:store.records,weeks:store.weeks,auth:store.auth||null,gate:store.gate||null}));}catch(e){}}
   function readLocalCache(){try{var s=localStorage.getItem(GH_CACHE_KEY);return s?JSON.parse(s):null;}catch(e){return null;}}
-  function restoreLocalCache(){var c=readLocalCache();if(c&&c.goals&&c.goals.length){store.goals=c.goals||[];store.records=c.records||[];store.weeks=c.weeks||[];store.auth=c.auth||null;store.sha=null;return true;}return false;}
+  function restoreLocalCache(){var c=readLocalCache();if(c&&c.goals&&c.goals.length){store.goals=c.goals||[];store.records=c.records||[];store.weeks=c.weeks||[];store.auth=c.auth||null;store.gate=c.gate||null;store.sha=null;return true;}return false;}
   function makeSample(){
     var t=todayMid();
     function ds(n){return fmtDate(addDays(t,-n));}
@@ -478,7 +483,7 @@
     var weeks=[{_id:"sw1",周起始:fmtDate(addDays(weekStart(t),-7)),周结束:fmtDate(addDays(weekStart(t),-1)),保持:"每天通勤背单词稳定",问题:"周末容易断",尝试:"把任务拆到早上",下周预案:"周末只安排 30 分钟",投入量:163,打卡天数:4,分钟数:325}];
     return {goals:goals,records:recs,weeks:weeks};
   }
-  function seedSample(){var s=makeSample();store.goals=s.goals;store.records=s.records;store.weeks=s.weeks;store.auth=null;store.sha=null;}
+  function seedSample(){var s=makeSample();store.goals=s.goals;store.records=s.records;store.weeks=s.weeks;store.auth=null;store.gate=null;store.sha=null;}
   function ghErrMsg(status,j){
     var jm=((j&&j.message)||"").toLowerCase();
     if(status===403&&jm.indexOf("rate limit")>=0)return "访问频率超限：GitHub 匿名访问每小时 60 次，请约 1 小时后再试，或登录管理员（令牌限额高得多）";
@@ -551,12 +556,13 @@
     var d=remote&&remote.data?remote.data:{};
     store.goals=d.goals||[];store.records=d.records||[];store.weeks=d.weeks||[];
     store.auth=d.auth||null;
+    store.gate=d.gate||null;
     store.sha=remote?remote.sha:null;
   }
   function markSynced(){state.lastSync=new Date();setSync("ok",state.lastSync.toLocaleString("zh-CN",{hour12:false}));}
   function ghDoPush(msg){
     var cfg=readGhCfg();
-    var payload=JSON.stringify({version:1,goals:store.goals,records:store.records,weeks:store.weeks,auth:store.auth||null});
+    var payload=JSON.stringify({version:1,goals:store.goals,records:store.records,weeks:store.weeks,auth:store.auth||null,gate:store.gate||null});
     var body={message:msg||"sync: 学习目标管理台",content:b64e(payload)}; // 不带 branch：提交到仓库默认分支
     if(store.sha)body.sha=store.sha;
     return ghApi("PUT",ghUrl(),body).then(function(j){
@@ -820,6 +826,15 @@
       bootstrap(); // 以访客身份匿名重新读取
     });
   }
+  function gateDef(){
+    var D={pass:"HLX666",seq:["g1","gand","g2"]}; // 默认：厚礼蟹→and→王德发
+    var g=store.gate;
+    if(g&&g.pass&&typeof g.pass==="string"&&Array.isArray(g.seq)){
+      var ok=g.seq.filter(function(x){return x==="g1"||x==="gand"||x==="g2";});
+      if(ok.length===g.seq.length&&ok.length>=2&&ok.length<=6)return {pass:g.pass,seq:ok};
+    }
+    return D;
+  }
   function renderMineSecurity(){
     var u=readUnlock();
     var whoEl=$("sec-who");
@@ -830,6 +845,12 @@
     var mfaBtn=$("sec-mfa-btn");if(mfaBtn)mfaBtn.textContent=mfaEnabled()?"关闭两步验证":"开启两步验证";
     var passEl=$("sec-pass");if(passEl)passEl.textContent=authHasPassword()?"已设置":"未设置";
     var passBtn=$("sec-pass-btn");if(passBtn)passBtn.textContent=authHasPassword()?"更换 / 移除登录密码":"设置登录密码";
+    var gateEl=$("sec-gate");
+    if(gateEl){
+      var gd=gateDef();
+      var custom=store.gate&&store.gate.pass&&store.gate.seq;
+      gateEl.textContent=gd.pass+" · "+(custom&&store.gate.seq.join()!=="g1,gand,g2"?("自定义 "+gd.seq.length+" 步"):"默认顺序");
+    }
     var outBtn=$("sec-logout");if(outBtn)outBtn.textContent=canEdit()?"退出登录":"管理员登录";
   }
   function setupPin(){
@@ -1214,7 +1235,7 @@
     if(!cfg||!cfg.owner||!cfg.repo){ // 无法确定数据仓库（如本地直接打开文件）
       if(!restoreLocalCache()){
         if(canEdit())seedSample();
-        else{store.goals=[];store.records=[];store.weeks=[];store.auth=null;}
+        else{store.goals=[];store.records=[];store.weeks=[];store.auth=null;store.gate=null;}
         store.sha=null;
       }
       setSync(canEdit()?"local":"ro",null);
@@ -1231,7 +1252,7 @@
         });
       }
       // 访客：远端无数据文件（或仓库私有导致 404）→ 展示空数据
-      store.goals=[];store.records=[];store.weeks=[];store.auth=null;store.sha=null;
+      store.goals=[];store.records=[];store.weeks=[];store.auth=null;store.gate=null;store.sha=null;
       setSync("ro",null);
       showBanner("只读模式：暂未读取到远端数据（数据文件尚未创建，或仓库为私有——访客只读需要仓库公开）。",false,"管理员登录",goLogin);
       return "skip-sync";
@@ -1242,7 +1263,7 @@
       state.failed=true;setSync("err",null);
       if(!canEdit()){ // 访客兜底：优先本地缓存，避免白屏
         if(restoreLocalCache()){setSync("ro",null);hideBanner();return applyStoreToState();}
-        store.goals=[];store.records=[];store.weeks=[];store.auth=null;store.sha=null;
+        store.goals=[];store.records=[];store.weeks=[];store.auth=null;store.gate=null;store.sha=null;
         applyStoreToState();
       }
       showBanner("GitHub 读取失败："+(err&&err.message?err.message:"网络异常")+"。"+
@@ -2137,9 +2158,8 @@
     $("lk-token").addEventListener("keydown",function(e){if(e.key==="Enter")lockVerify();});
     $("lk-pin").addEventListener("keydown",function(e){if(e.key==="Enter")lockVerify();});
     $("lk-mfa").addEventListener("keydown",function(e){if(e.key==="Enter")lockVerify();});
-    /* ---------- 秘密通道：3 秒内按序点击品牌字「厚礼蟹→and→王德发」唤起管理员登录 ---------- */
-    var GATE_PASS="HLX666"; // 通关密码，数字字母都行（校验忽略大小写），想改就改这里
-    var GATE_IDS=["g1","gand","g2"],GATE_WINDOW=3000;
+    /* ---------- 秘密通道：按序点击品牌字唤起管理员登录（顺序与通关密码可在管理后台自定义） ---------- */
+    var GATE_WINDOW=3000;
     var gateStep=0,gateTimer=null;
     function gateReset(){gateStep=0;if(gateTimer){clearTimeout(gateTimer);gateTimer=null;}}
     function gateOpen(){
@@ -2181,7 +2201,7 @@
       }
       function submit(){
         if(!buf)return;
-        if(buf.toUpperCase()===String(GATE_PASS).toUpperCase()){close();toast("通道开启，欢迎回来","ok");showLock("");}
+        if(buf.toUpperCase()===gateDef().pass.toUpperCase()){close();toast("通道开启，欢迎回来","ok");showLock("");}
         else{
           buf="";render();
           dots.classList.remove("gate-shake");void dots.offsetWidth;dots.classList.add("gate-shake");
@@ -2202,31 +2222,83 @@
       document.addEventListener("keydown",keydown);
     }
     (function gateInit(){
+      var names=["g1","gand","g2"];
       var brands=document.querySelectorAll(".brand");
       for(var bi=0;bi<brands.length;bi++){
         (function(brand){
-          for(var i=0;i<GATE_IDS.length;i++){
-            (function(idx){
-              var el=brand.querySelector(".gname."+GATE_IDS[idx]);
+          for(var i=0;i<names.length;i++){
+            (function(id){
+              var el=brand.querySelector(".gname."+id);
               if(!el)return;
               el.addEventListener("click",function(e){
                 e.stopPropagation();
                 if(canEdit())return;
-                if(idx!==gateStep){gateReset();return;}
+                var seq=gateDef().seq;
+                if(seq[gateStep]!==id){gateReset();return;}
                 gateStep++;
                 if(gateTimer)clearTimeout(gateTimer);
                 gateTimer=setTimeout(gateReset,GATE_WINDOW);
-                if(gateStep===GATE_IDS.length)gateOpen();
+                if(gateStep===seq.length)gateOpen();
               });
-            })(i);
+            })(names[i]);
           }
         })(brands[bi]);
       }
     })();
+    function gateEnsure(){
+      if(!store.gate||!store.gate.pass||!Array.isArray(store.gate.seq)){
+        var d=gateDef();
+        store.gate={pass:(store.gate&&store.gate.pass)||d.pass,seq:(store.gate&&store.gate.seq)||d.seq.slice()};
+      }
+      return store.gate;
+    }
+    function gateChangePass(){
+      if(!requireEdit())return;
+      uiPrompt("修改通关密码","输入新的通关密码（数字或字母，1-12 位，校验忽略大小写）：",{type:"password"}).then(function(p){
+        if(p===null)return;
+        p=String(p).trim().replace(/\s+/g,"");
+        if(!p||p.length>12){toast("通关密码需 1-12 位数字或字母","err");return;}
+        var g=gateEnsure();g.pass=p;
+        gateReset();persist();renderMineSecurity();
+        toast("通关密码已更新，同步后全设备生效","ok");
+      });
+    }
+    function gateRecordSeq(){
+      if(!requireEdit())return;
+      if(document.getElementById("gate-rec"))return;
+      var steps=[];
+      var bar=document.createElement("div");
+      bar.id="gate-rec";
+      bar.style.cssText="position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:120;display:flex;gap:10px;align-items:center;background:var(--purpleSoft);color:var(--purple);font-size:13px;font-weight:700;padding:10px 14px;border-radius:14px;box-shadow:0 6px 24px rgba(0,0,0,.15);white-space:nowrap";
+      bar.innerHTML='<span id="gate-rec-tip">录制中：依次点击品牌字（至少 2 步，至多 6 步）· 已录 0 步</span>'+
+        '<button class="btn btn-primary" id="gate-rec-done" style="padding:6px 14px">完成</button>'+
+        '<button class="btn btn-line" id="gate-rec-cancel" style="padding:6px 14px">取消</button>';
+      document.body.appendChild(bar);
+      function tip(){var t=document.getElementById("gate-rec-tip");if(t)t.textContent="录制中：依次点击品牌字（至少 2 步，至多 6 步）· 已录 "+steps.length+" 步";}
+      function onRec(e){
+        var el=e.target.closest?e.target.closest(".gname"):null;
+        if(!el)return;
+        var id=el.classList.contains("g1")?"g1":(el.classList.contains("gand")?"gand":(el.classList.contains("g2")?"g2":null));
+        if(!id)return;
+        if(steps.length>=6){toast("最多 6 步，点「完成」结束录制","err");return;}
+        steps.push(id);tip();
+      }
+      function cleanup(){document.removeEventListener("click",onRec,true);if(bar.parentNode)bar.parentNode.removeChild(bar);}
+      document.addEventListener("click",onRec,true);
+      document.getElementById("gate-rec-cancel").onclick=function(){cleanup();toast("已取消录制，顺序未改动","ok");};
+      document.getElementById("gate-rec-done").onclick=function(){
+        if(steps.length<2){toast("至少录制 2 步","err");return;}
+        var g=gateEnsure();g.seq=steps.slice();
+        gateReset();cleanup();persist();renderMineSecurity();
+        toast("点击顺序已更新，同步后全设备生效","ok");
+      };
+    }
     $("sec-logout").onclick=function(){if(canEdit())logout();else goLogin();};
     $("sec-pass-btn").onclick=setupLoginPassword;
     $("sec-pin-btn").onclick=setupPin;
     $("sec-mfa-btn").onclick=setupMfa;
+    $("sec-gate-pass").onclick=gateChangePass;
+    $("sec-gate-seq").onclick=gateRecordSeq;
     $("sec-days").onchange=function(){
       try{localStorage.setItem(SESS_KEY,this.value);}catch(e){}
       var u=readUnlock();
