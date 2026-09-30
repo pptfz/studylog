@@ -791,6 +791,7 @@
         hideLock();applyMode();renderMineSecurity();
         toast("登录成功","ok top");
         authSync().catch(function(){}); // 令牌可能更新，重新加密同步登录密码数据
+        gateMigrateLegacy(); // 旧版明文通关密码自动升级加密
         bootstrap();
       }
       if(mfaEnabled()){
@@ -831,16 +832,28 @@
     });
   }
   function gateDef(){
-    var D={pass:"HLX666",seq:["蟹","d","发"]}; // 默认：蟹→d→发（单字符）
+    var D={pass:"HLX666",seq:["蟹","d","发"]}; // 默认：蟹→d→发（改过密码后即加密存储）
     var LEG={"g1":"蟹","gand":"d","g2":"发"}; // 旧版整词顺序迁移
     var CH="厚礼蟹and王德发";
-    var g=store.gate;
-    if(g&&g.pass&&typeof g.pass==="string"&&Array.isArray(g.seq)){
+    var g=store.gate,seq=null,pass=D.pass;
+    if(g&&Array.isArray(g.seq)){
       var ok=g.seq.map(function(x){return (typeof x==="string"&&LEG[x])?LEG[x]:x;});
       ok=ok.filter(function(x){return typeof x==="string"&&x.length===1&&CH.indexOf(x)>=0;});
-      if(ok.length===g.seq.length&&ok.length>=2&&ok.length<=9)return {pass:g.pass,seq:ok};
+      if(ok.length===g.seq.length&&ok.length>=2&&ok.length<=9)seq=ok;
     }
-    return D;
+    if(g&&typeof g.pass==="string"&&g.pass)pass=g.pass; // 旧版明文（登录后自动转加密）
+    return {pass:pass,seq:seq||D.seq,legacy:!!(g&&g.pass),enc:!!(g&&g.sec)};
+  }
+  function gateMigrateLegacy(){ // 管理员登录后，把旧版明文通关密码升级为 AES-GCM 加密存储
+    var g=store.gate;
+    if(!g||!g.pass||g.sec)return;
+    makeAuthBlob(g.pass.toLowerCase(),{pass:g.pass.toLowerCase()}).then(function(r){
+      if(store.gate&&store.gate.pass===g.pass&&!store.gate.sec){
+        store.gate={seq:store.gate.seq||[],sec:r.blob};
+        persist();
+        renderMineSecurity();
+      }
+    }).catch(function(){});
   }
   function renderMineSecurity(){
     var u=readUnlock();
@@ -855,9 +868,9 @@
     var gateEl=$("sec-gate");
     if(gateEl){
       var gd=gateDef();
-      var custom=store.gate&&store.gate.pass&&store.gate.seq;
-      var isDef=gd.seq.join("")==="蟹d发";
-      gateEl.textContent=gd.pass+" · "+(custom&&!isDef?("自定义「"+gd.seq.join("")+"」"):"默认顺序");
+      var custom=store.gate&&Array.isArray(store.gate.seq)&&store.gate.seq.join("")!=="蟹d发";
+      var seqTxt=custom?("自定义「"+gd.seq.join("")+"」"):"默认顺序";
+      gateEl.textContent=(store.gate&&store.gate.sec)?("已加密 · "+seqTxt):(gd.pass+" · "+seqTxt+(store.gate&&store.gate.pass?"（未加密）":""));
     }
     var outBtn=$("sec-logout");if(outBtn)outBtn.textContent=canEdit()?"退出登录":"管理员登录";
   }
@@ -1051,6 +1064,7 @@
         btn.disabled=false;btn.textContent="密码登录";
         hideLock();applyMode();renderMineSecurity();
         toast("登录成功","ok top");
+        gateMigrateLegacy(); // 旧版明文通关密码自动升级加密
         bootstrap();
       }
       if(mfaSecret){
@@ -2208,14 +2222,24 @@
         if(mask.parentNode)mask.parentNode.removeChild(mask);
         document.removeEventListener("keydown",keydown);
       }
+      function shakeWrong(){
+        buf="";render();
+        dots.classList.remove("gate-shake");void dots.offsetWidth;dots.classList.add("gate-shake");
+        toast("通关密码不对，再试试","err");
+      }
       function submit(){
         if(!buf)return;
-        if(buf.toUpperCase()===gateDef().pass.toUpperCase()){close();toast("通道开启，欢迎回来","ok");showLock("");}
-        else{
-          buf="";render();
-          dots.classList.remove("gate-shake");void dots.offsetWidth;dots.classList.add("gate-shake");
-          toast("通关密码不对，再试试","err");
+        var g=store.gate;
+        if(g&&g.sec&&g.sec.enc){ // 加密通关密码：AES-GCM 解密成功即密码正确
+          deriveAuthBits(buf.toLowerCase(),b64ToBytes(g.sec.salt),g.sec.iter||AUTH_ITER)
+            .then(importAesKey)
+            .then(function(key){return aesDecrypt(key,g.sec.enc.iv,g.sec.enc.data);})
+            .then(function(){close();toast("通道开启，欢迎回来","ok");showLock("");})
+            .catch(shakeWrong);
+          return;
         }
+        if(buf.toUpperCase()===gateDef().pass.toUpperCase()){close();toast("通道开启，欢迎回来","ok");showLock("");}
+        else shakeWrong();
       }
       mask.addEventListener("click",function(e){if(e.target===mask)close();});
       $("gate-cancel").onclick=close;
@@ -2263,22 +2287,17 @@
         })(chars[ci]);
       }
     })();
-    function gateEnsure(){
-      if(!store.gate||!store.gate.pass||!Array.isArray(store.gate.seq)){
-        var d=gateDef();
-        store.gate={pass:(store.gate&&store.gate.pass)||d.pass,seq:(store.gate&&store.gate.seq)||d.seq.slice()};
-      }
-      return store.gate;
-    }
     function gateChangePass(){
       if(!requireEdit())return;
-      uiPrompt("修改通关密码","输入新的通关密码（数字或字母，1-12 位，校验忽略大小写）：",{type:"password"}).then(function(p){
+      uiPrompt("修改通关密码","输入新的通关密码（数字或字母，1-12 位，不区分大小写）：",{type:"password"}).then(function(p){
         if(p===null)return;
-        p=String(p).trim().replace(/\s+/g,"");
+        p=String(p).trim().replace(/\s+/g,"").toLowerCase();
         if(!p||p.length>12){toast("通关密码需 1-12 位数字或字母","err");return;}
-        var g=gateEnsure();g.pass=p;
-        gateReset();persist();renderMineSecurity();
-        toast("通关密码已更新，同步后全设备生效","ok");
+        makeAuthBlob(p,{pass:p}).then(function(r){ // PBKDF2+AES-GCM 加密，仓库里不存明文
+          store.gate={seq:(store.gate&&store.gate.seq)||gateDef().seq,sec:r.blob};
+          gateReset();persist();renderMineSecurity();
+          toast("通关密码已加密更新，同步后全设备生效","ok");
+        }).catch(function(){toast("加密失败，请重试","err");});
       });
     }
     function gateRecordSeq(){
@@ -2306,9 +2325,15 @@
       document.getElementById("gate-rec-cancel").onclick=function(){cleanup();toast("已取消录制，顺序未改动","ok");};
       document.getElementById("gate-rec-done").onclick=function(){
         if(steps.length<2){toast("至少录制 2 步","err");return;}
-        var g=gateEnsure();g.seq=steps.slice();
-        gateReset();cleanup();persist();renderMineSecurity();
-        toast("点击顺序已更新，同步后全设备生效","ok");
+        var g=store.gate||{};
+        function applySeq(sec){
+          store.gate=sec?{seq:steps.slice(),sec:sec}:{seq:steps.slice()};
+          gateReset();cleanup();persist();renderMineSecurity();
+          toast("点击顺序已更新，同步后全设备生效","ok");
+        }
+        if(g.sec)applySeq(g.sec); // 已加密：保留密文，只换顺序
+        else if(g.pass)makeAuthBlob(g.pass.toLowerCase(),{pass:g.pass.toLowerCase()}).then(function(r){applySeq(r.blob);}).catch(function(){toast("加密失败，请重试","err");}); // 旧明文顺带升级加密
+        else applySeq(null); // 从未改过密码：仍用代码内默认密码
       };
     }
     $("sec-logout").onclick=function(){if(canEdit())logout();else goLogin();};
