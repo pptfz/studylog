@@ -251,18 +251,9 @@
   body.readonly .edit-only{display:none!important}
   body.readonly .ci-form,body.readonly .ci-actions,body.readonly .rec-del,body.readonly .qmark{display:none!important}
   body.readonly #tab-week textarea{pointer-events:none;background:var(--bg)}
-  #ro-bar{display:none;position:fixed;left:0;right:0;top:0;z-index:60;height:36px;line-height:36px;background:var(--purpleSoft);color:var(--purple);
-    font-size:13px;font-weight:700;padding:0 14px;text-align:center;cursor:pointer;box-shadow:0 1px 0 var(--line)}
-  body.readonly #ro-bar{display:block}
-  body.readonly .main{padding-top:52px}
-  @media (min-width:1024px){
-    body.readonly .main{padding-top:52px}
-    body.readonly .nav{top:36px;height:calc(100vh - 36px)}
-  }
 </style>
 </head>
 <body>
-<div id="ro-bar">只读模式 · 点击登录管理员后可编辑</div>
 <div id="lock" class="hidden">
   <div class="lock-card">
     <div class="lock-logo"><svg viewBox="0 0 24 24" fill="none"><path d="M4 5h16v14H4z" stroke="#7C5CFF" stroke-width="2" stroke-linejoin="round"/><path d="M8 9h8M8 13h5" stroke="#9D7BFF" stroke-width="2" stroke-linecap="round"/></svg>管理员登录</div>
@@ -2136,7 +2127,41 @@
     $("lk-token").addEventListener("keydown",function(e){if(e.key==="Enter")lockVerify();});
     $("lk-pin").addEventListener("keydown",function(e){if(e.key==="Enter")lockVerify();});
     $("lk-mfa").addEventListener("keydown",function(e){if(e.key==="Enter")lockVerify();});
-    $("ro-bar").onclick=goLogin; // 只读提示条 → 唤起登录
+    /* ---------- 秘密通道：3 秒内按序点击品牌字「厚礼蟹→and→王德发」唤起管理员登录 ---------- */
+    var GATE_PASS="hlx666"; // 通关密码，想改就改这里
+    var GATE_IDS=["g1","gand","g2"],GATE_WINDOW=3000;
+    var gateStep=0,gateTimer=null;
+    function gateReset(){gateStep=0;if(gateTimer){clearTimeout(gateTimer);gateTimer=null;}}
+    function gatePrompt(){
+      gateReset();
+      uiPrompt("秘密通道","🎉 你发现了一条隐藏通道！输入通关密码，打开管理员入口：",{type:"password",okText:"解锁"}).then(function(p){
+        if(p===null)return;
+        if(p===GATE_PASS){toast("通道开启，欢迎回来","ok");showLock("");}
+        else toast("通关密码不对，通道已关闭","err");
+      });
+    }
+    (function gateInit(){
+      var brands=document.querySelectorAll(".brand");
+      for(var bi=0;bi<brands.length;bi++){
+        (function(brand){
+          for(var i=0;i<GATE_IDS.length;i++){
+            (function(idx){
+              var el=brand.querySelector(".gname."+GATE_IDS[idx]);
+              if(!el)return;
+              el.addEventListener("click",function(e){
+                e.stopPropagation();
+                if(canEdit())return;
+                if(idx!==gateStep){gateReset();return;}
+                gateStep++;
+                if(gateTimer)clearTimeout(gateTimer);
+                gateTimer=setTimeout(gateReset,GATE_WINDOW);
+                if(gateStep===GATE_IDS.length)gatePrompt();
+              });
+            })(i);
+          }
+        })(brands[bi]);
+      }
+    })();
     $("sec-logout").onclick=function(){if(canEdit())logout();else goLogin();};
     $("sec-pass-btn").onclick=setupLoginPassword;
     $("sec-pin-btn").onclick=setupPin;
