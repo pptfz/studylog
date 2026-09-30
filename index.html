@@ -778,6 +778,7 @@
         writeUnlock({login:login,until:Date.now()+sessDays()*DAY,at:Date.now()});
         btn.disabled=false;btn.textContent="验证并进入";
         hideLock();applyMode();renderMineSecurity();
+        toast("登录成功","ok");
         authSync().catch(function(){}); // 令牌可能更新，重新加密同步登录密码数据
         bootstrap();
       }
@@ -1011,7 +1012,9 @@
         var bits=authKeyCacheGet();
         writeUnlock({login:"admin",until:Date.now()+sessDays()*DAY,at:Date.now()});
         btn.disabled=false;btn.textContent="密码登录";
-        hideLock();applyMode();renderMineSecurity();bootstrap();
+        hideLock();applyMode();renderMineSecurity();
+        toast("登录成功","ok");
+        bootstrap();
       }
       if(mfaSecret){
         var mfaRow=$("lk-pass-mfa-row");
