@@ -806,16 +806,18 @@
     });
   }
   function logout(){
-    if(!confirm("退出管理员登录后，本机将清除令牌与解锁状态，页面回到只读浏览模式。确定退出？"))return;
-    clearUnlock();
-    authKeyCacheClear();
-    var cfg=readGhCfg();
-    if(cfg)writeGhCfg({owner:cfg.owner,repo:cfg.repo,branch:cfg.branch,path:cfg.path,token:""});
-    try{localStorage.removeItem(GH_CACHE_KEY);}catch(e){}
-    state.goals=[];state.records=[];state.weeks=[];state.loaded=false;
-    store.goals=[];store.records=[];store.weeks=[];store.sha=null;
-    hideLock();applyMode();renderMineSecurity();refreshAll();
-    bootstrap(); // 以访客身份匿名重新读取
+    uiConfirm("退出登录","退出管理员登录后，本机将清除令牌与解锁状态，页面回到只读浏览模式。确定退出？").then(function(ok){
+      if(!ok)return;
+      clearUnlock();
+      authKeyCacheClear();
+      var cfg=readGhCfg();
+      if(cfg)writeGhCfg({owner:cfg.owner,repo:cfg.repo,branch:cfg.branch,path:cfg.path,token:""});
+      try{localStorage.removeItem(GH_CACHE_KEY);}catch(e){}
+      state.goals=[];state.records=[];state.weeks=[];state.loaded=false;
+      store.goals=[];store.records=[];store.weeks=[];store.sha=null;
+      hideLock();applyMode();renderMineSecurity();refreshAll();
+      bootstrap(); // 以访客身份匿名重新读取
+    });
   }
   function renderMineSecurity(){
     var u=readUnlock();
@@ -833,14 +835,18 @@
     if(!requireEdit())return;
     var cur=readPin();
     if(cur){
-      if(!confirm("移除本机已设置的本地口令？"))return;
-      writePin("");toast("已移除本地口令","ok");renderMineSecurity();return;
+      uiConfirm("本地口令","移除本机已设置的本地口令？",{danger:true}).then(function(ok){
+        if(!ok)return;
+        writePin("");toast("已移除本地口令","ok");renderMineSecurity();
+      });
+      return;
     }
-    var p=prompt("设置一个 4-8 位本地口令（仅存本机浏览器，用于防止他人随手打开本页面）：");
-    if(p===null)return;
-    p=String(p).trim();
-    if(p.length<4||p.length>8){toast("口令需 4-8 位","err");return;}
-    writePin(p);toast("已设置本地口令","ok");renderMineSecurity();
+    uiPrompt("设置本地口令","输入 4-8 位口令（仅存本机浏览器，用于防止他人随手打开本页面）：",{type:"password"}).then(function(p){
+      if(p===null)return;
+      p=String(p).trim();
+      if(p.length<4||p.length>8){toast("口令需 4-8 位","err");return;}
+      writePin(p);toast("已设置本地口令","ok");renderMineSecurity();
+    });
   }
   /* ---------- 两步验证 MFA（TOTP / RFC 6238，浏览器内置 Web Crypto 实现，无外部依赖） ---------- */
   var MFA_KEY="wb_lg_mfa",MFA_FAIL_KEY="wb_lg_mfa_fail",MFA_LOCK_KEY="wb_lg_mfa_lock";
@@ -935,12 +941,13 @@
     if(!requireEdit())return;
     if(!(window.crypto&&crypto.subtle)){toast("需通过 https 打开页面才能使用两步验证","err");return;}
     if(mfaEnabled()){
-      var c=prompt("关闭两步验证：请输入验证器 App 当前的 6 位验证码");
-      if(c===null)return;
-      mfaCheckInput(c).then(function(ok){
-        if(!ok){toast("验证码不正确","err");return;}
-        writeMfa("");mfaResetFail();toast("已关闭两步验证","ok");renderMineSecurity();authSync().catch(function(){});
-      }).catch(function(){toast("校验失败","err");});
+      uiPrompt("关闭两步验证","请输入验证器 App 当前的 6 位验证码：",{placeholder:"000000"}).then(function(c){
+        if(c===null)return;
+        mfaCheckInput(c).then(function(ok){
+          if(!ok){toast("验证码不正确","err");return;}
+          writeMfa("");mfaResetFail();toast("已关闭两步验证","ok");renderMineSecurity();authSync().catch(function(){});
+        }).catch(function(){toast("校验失败","err");});
+      });
       return;
     }
     var bytes=new Uint8Array(20);
@@ -1038,32 +1045,70 @@
     var cfg=readGhCfg()||{};
     if(!cfg.token){toast("请先配置 GitHub 令牌","err");return;}
     var has=authHasPassword();
-    var chain=Promise.resolve({token:cfg.token,mfa:readMfa()});
+    var chain;
     if(has){
-      var cur=prompt("已设置过登录密码。请输入当前密码以验证：");
-      if(cur===null)return;
-      chain=decryptAuthBlob(cur);
+      chain=uiPrompt("更换登录密码","请输入当前登录密码以验证：",{type:"password"}).then(function(cur){
+        if(cur===null)return Promise.reject(null);
+        return decryptAuthBlob(cur).catch(function(){throw new Error("当前密码不正确");});
+      });
+    }else{
+      chain=Promise.resolve({token:cfg.token,mfa:readMfa()});
     }
     chain.then(function(payload){
-      var np=prompt(has?"输入新登录密码（至少 10 位；留空并确定 = 移除密码登录）：":"设置登录密码（至少 10 位，用于任何设备上「密码+动态码」登录）：");
-      if(np===null)return;
-      np=String(np);
-      if(!np){
-        if(!has)return;
-        if(!confirm("确定移除登录密码？之后任何设备都只能用令牌登录。"))return;
-        store.auth=null;authKeyCacheClear();persist();renderMineSecurity();
-        toast("已移除登录密码","ok");return;
-      }
-      if(np.length<10){toast("密码至少 10 位（建议短语+数字，如 study-2026-js!）","err");return;}
-      var np2=prompt("再输入一次确认：");
-      if(np2===null)return;
-      if(np2!==np){toast("两次输入不一致","err");return;}
-      makeAuthBlob(np,payload).then(function(r){
-        store.auth=r.blob;authKeyCacheSet(r.bits);persist();
-        renderMineSecurity();
-        toast("登录密码已保存（令牌已加密同步进仓库，可跨设备密码登录）","ok");
-      }).catch(function(e){toast("保存失败："+(e&&e.message||"环境不支持"),"err");});
-    }).catch(function(e){toast((e&&e.message)||"当前密码不正确","err");});
+      return uiPrompt(has?"更换登录密码":"设置登录密码",
+        has?"输入新登录密码（留空并确定 = 移除密码登录）：":"至少 10 位，用于任何设备上「密码+动态码」登录：",{type:"password"}).then(function(np){
+        if(np===null)return null;
+        np=String(np);
+        if(!np){
+          if(!has)return null;
+          return uiConfirm("移除登录密码","确定移除登录密码？之后任何设备都只能用令牌登录。",{danger:true}).then(function(ok){
+            if(!ok)return null;
+            store.auth=null;authKeyCacheClear();persist();renderMineSecurity();
+            toast("已移除登录密码","ok");return null;
+          });
+        }
+        if(np.length<10){toast("密码至少 10 位（建议短语+数字，如 study-2026-js!）","err");return null;}
+        return uiPrompt("确认新密码","再输入一次确认：",{type:"password"}).then(function(np2){
+          if(np2===null)return null;
+          if(np2!==np){toast("两次输入不一致","err");return null;}
+          return makeAuthBlob(np,payload).then(function(r){
+            store.auth=r.blob;authKeyCacheSet(r.bits);persist();
+            renderMineSecurity();
+            toast("登录密码已保存（令牌已加密同步进仓库，可跨设备密码登录）","ok");
+          }).catch(function(e){toast("保存失败："+(e&&e.message||"环境不支持"),"err");});
+        });
+      });
+    }).catch(function(e){if(e&&e.message)toast(e.message,"err");});
+  }
+  /* ---------- 平台内弹窗（替代浏览器原生 prompt/confirm） ---------- */
+  function uiDialog(cfg){ // 确定时 resolve 字段值数组，取消时 resolve null
+    return new Promise(function(resolve){
+      var fields=cfg.fields||[];
+      var fieldsHtml=fields.map(function(f,i){
+        return '<div class="form-row"><label>'+esc(f.label)+'</label><input id="ui-f'+i+'" type="'+(f.type||"text")+'" value="'+esc(f.value||"")+'" placeholder="'+esc(f.placeholder||"")+'" autocomplete="off"></div>';
+      }).join("");
+      var html='<div class="mask" id="mask"><div class="modal">'+
+        '<h3>'+esc(cfg.title)+'</h3>'+
+        (cfg.body?'<div class="small muted" style="margin-bottom:10px;line-height:1.6">'+cfg.body+'</div>':'')+
+        fieldsHtml+
+        '<div class="row" style="gap:10px;margin-top:12px"><button class="btn '+(cfg.danger?"btn-danger":"btn-primary")+'" id="ui-ok" style="flex:1">'+esc(cfg.okText||"确定")+'</button><button class="btn btn-line" id="ui-cancel" style="flex:1">取消</button></div>'+
+        '</div></div>';
+      document.body.insertAdjacentHTML("beforeend",html);
+      var mask=$("mask");
+      function close(v){if(mask.parentNode)mask.parentNode.removeChild(mask);resolve(v);}
+      $("ui-cancel").onclick=function(){close(null);};
+      mask.onclick=function(e){if(e.target===mask)close(null);};
+      $("ui-ok").onclick=function(){close(fields.map(function(f,i){return $("ui-f"+i).value;}));};
+      if(fields[0])$("ui-f0").focus();
+      fields.forEach(function(f,i){$("ui-f"+i).addEventListener("keydown",function(e){if(e.key==="Enter")$("ui-ok").click();});});
+    });
+  }
+  function uiPrompt(title,label,opts){opts=opts||{};
+    return uiDialog({title:title,body:opts.body,okText:opts.okText,danger:opts.danger,fields:[{label:label,type:opts.type||"text",value:opts.value||"",placeholder:opts.placeholder||""}]})
+      .then(function(v){return v?v[0]:null;});
+  }
+  function uiConfirm(title,msg,opts){opts=opts||{};
+    return uiDialog({title:title,body:esc(msg),okText:opts.okText||"确定",danger:opts.danger}).then(function(v){return v!==null;});
   }
   function todayMonth(){return fmtDate(todayMid()).slice(0,7);}
 
@@ -1968,25 +2013,35 @@
   }
   function deleteGoal(id){
     if(!requireEdit())return;
-    if(!confirm("确定删除主题「"+(goalById(id)?goalById(id)["名称"]:"")+"」？其打卡记录也会一并删除，不可恢复。"))return;
+    var name=goalById(id)?goalById(id)["名称"]:"";
+    uiConfirm("删除主题","确定删除主题「"+esc(name)+"」？其打卡记录也会一并删除，不可恢复。",{okText:"删除",danger:true}).then(function(ok){
+      if(!ok)return;
     var recIds=goalRecords(id).map(function(r){return r._id;});
     delMany("recs",recIds)
       .then(function(){return db.deleteRecord({databaseId:"9nIIvmmotq14ss1cKCUPeW",recordId:id});})
       .then(function(){toast("已删除","ok");return Promise.all([loadAll("goals"),loadAll("recs")]);})
       .then(function(r){state.goals=r[0];state.records=r[1];refreshAll();})
       .catch(function(err){toast("删除失败："+(err&&err.message||"网络异常"),"err");});
+    });
   }
   function deleteRecord(rid){
     if(!requireEdit())return;
-    if(!confirm("删除这条打卡记录？"))return;
-    db.deleteRecord({databaseId:"GQStptycSFER64kKNZGrtL",recordId:rid}).then(function(){
-      toast("已删除记录","ok");return loadAll("recs");
-    }).then(function(recs){state.records=recs;refreshAll();})
-      .catch(function(err){toast("删除失败："+(err&&err.message||"网络异常"),"err");});
+    uiConfirm("删除记录","删除这条打卡记录？",{okText:"删除",danger:true}).then(function(ok){
+      if(!ok)return;
+      db.deleteRecord({databaseId:"GQStptycSFER64kKNZGrtL",recordId:rid}).then(function(){
+        toast("已删除记录","ok");return loadAll("recs");
+      }).then(function(recs){state.records=recs;refreshAll();})
+        .catch(function(err){toast("删除失败："+(err&&err.message||"网络异常"),"err");});
+    });
   }
   function clearSample(){
     if(!requireEdit())return;
-    if(!confirm("清空示例数据：删除全部打卡记录与周报复盘（学习主题保留）。确定？"))return;
+    uiConfirm("清空示例数据","删除全部打卡记录与周报复盘（学习主题保留）。确定？",{okText:"清空",danger:true}).then(function(ok){
+      if(!ok)return;
+      doClearSample();
+    });
+  }
+  function doClearSample(){
     var recIds=state.records.map(function(r){return r._id;});
     var wkIds=state.weeks.map(function(r){return r._id;});
     delMany("recs",recIds).then(function(){return delMany("weeks",wkIds);})
@@ -1997,7 +2052,12 @@
   function clearAll(){
     if(!requireEdit())return;
     if($("clear-all-input").value.trim()!=="清空"){toast("请输入「清空」","err");return;}
-    if(!confirm("确认清空全部数据（主题+记录+周报）？此操作不可恢复！"))return;
+    uiConfirm("清空全部数据","确认清空全部数据（主题+记录+周报）？此操作不可恢复！",{okText:"全部清空",danger:true}).then(function(ok){
+      if(!ok)return;
+      doClearAll();
+    });
+  }
+  function doClearAll(){
     var gIds=state.goals.map(function(r){return r._id;});
     var recIds=state.records.map(function(r){return r._id;});
     var wkIds=state.weeks.map(function(r){return r._id;});
@@ -2062,11 +2122,13 @@
     $("lk-clear-token").onclick=function(){
       var c=readGhCfg();
       if(!c||!c.token){toast("本机没有保存令牌","err");return;}
-      if(!confirm("清除本机保存的令牌？（仓库信息保留，下次登录需重新输入令牌）"))return;
-      writeGhCfg({owner:c.owner,repo:c.repo,branch:c.branch,path:c.path,token:""});
-      authKeyCacheClear();
-      toast("已清除本机令牌","ok");
-      showLock("");
+      uiConfirm("清除本机令牌","清除本机保存的令牌？（仓库信息保留，下次登录需重新输入令牌）",{danger:true}).then(function(ok){
+        if(!ok)return;
+        writeGhCfg({owner:c.owner,repo:c.repo,branch:c.branch,path:c.path,token:""});
+        authKeyCacheClear();
+        toast("已清除本机令牌","ok");
+        showLock("");
+      });
     };
     $("lk-pass").addEventListener("keydown",function(e){if(e.key==="Enter")lockVerifyPass();});
     $("lk-pass-mfa").addEventListener("keydown",function(e){if(e.key==="Enter")lockVerifyPass();});
