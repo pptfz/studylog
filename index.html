@@ -1147,16 +1147,29 @@
         '<h3>'+esc(cfg.title)+'</h3>'+
         (cfg.body?'<div class="small muted" style="margin-bottom:10px;line-height:1.6">'+cfg.body+'</div>':'')+
         fieldsHtml+
+        '<div id="ui-err" style="display:none;color:#e5484d;font-size:13px;margin-top:8px;font-weight:600"></div>'+
         '<div class="row" style="gap:10px;margin-top:12px"><button class="btn '+(cfg.danger?"btn-danger":"btn-primary")+'" id="ui-ok" style="flex:1">'+esc(cfg.okText||"确定")+'</button><button class="btn btn-line" id="ui-cancel" style="flex:1">取消</button></div>'+
         '</div></div>';
       document.body.insertAdjacentHTML("beforeend",html);
       var mask=document.body.lastElementChild; // 直接捕获刚插入的弹窗（避免与残留的同 id 弹窗串绑）
+      var errEl=mask.querySelector("#ui-err");
       function close(v){if(mask.parentNode)mask.parentNode.removeChild(mask);resolve(v);}
       mask.querySelector("#ui-cancel").onclick=function(){close(null);};
       mask.onclick=function(e){if(e.target===mask)close(null);};
-      mask.querySelector("#ui-ok").onclick=function(){close(fields.map(function(f,i){return mask.querySelector("#ui-f"+i).value;}));};
+      mask.querySelector("#ui-ok").onclick=function(){
+        var vals=fields.map(function(f,i){return mask.querySelector("#ui-f"+i).value;});
+        if(cfg.validate){ // 校验不过：弹窗内提示错误，不关闭，用户可改了重试
+          var err=cfg.validate(vals);
+          if(err){errEl.textContent=err;errEl.style.display="block";return;}
+        }
+        close(vals);
+      };
       if(fields[0])mask.querySelector("#ui-f0").focus();
-      fields.forEach(function(f,i){mask.querySelector("#ui-f"+i).addEventListener("keydown",function(e){if(e.key==="Enter")mask.querySelector("#ui-ok").click();});});
+      fields.forEach(function(f,i){
+        var inp=mask.querySelector("#ui-f"+i);
+        inp.addEventListener("keydown",function(e){if(e.key==="Enter")mask.querySelector("#ui-ok").click();});
+        inp.addEventListener("input",function(){errEl.style.display="none";}); // 重新输入时隐藏错误提示
+      });
     });
   }
   function uiPrompt(title,label,opts){opts=opts||{};
@@ -2322,23 +2335,32 @@
         if(konamiStep===keys.length)gateOpen();
       });
     })();
-    function gateChangePass(){ // 管理员重设通关密码：新密码输入两次确认，AES-GCM 加密存储
+    function gateChangePass(){ // 管理员重设通关密码：同一弹窗两行输入确认，不一致弹窗内提示且不关闭，AES-GCM 加密存储
       if(!requireEdit())return;
-      uiPrompt("设置通关密码","输入新的通关密码（数字或字母，1-12 位，不区分大小写）：",{type:"password"}).then(function(p1){
-        if(p1===null)return;
-        p1=String(p1).trim().replace(/\s+/g,"").toLowerCase();
-        if(!p1||p1.length>12){toast("通关密码需 1-12 位数字或字母","err");return;}
-        uiPrompt("确认新通关密码","再输入一次相同的通关密码：",{type:"password"}).then(function(p2){
-          if(p2===null)return;
-          p2=String(p2).trim().replace(/\s+/g,"").toLowerCase();
-          if(p2!==p1){toast("两次输入不一致，请重试","err");return;}
-          makeAuthBlob(p1,{pass:p1}).then(function(r){ // PBKDF2+AES-GCM 加密，仓库里不存明文
-            var g=store.gate||{};
-            store.gate={seq:g.seq||gateDef().seq,keys:g.keys||gateDef().keys,sec:r.blob};
-            gateReset();konamiReset();persist();renderMineSecurity();
-            toast("通关密码已加密更新，同步后全设备生效","ok");
-          }).catch(function(){toast("加密失败，请重试","err");});
-        });
+      function norm(s){return String(s).trim().replace(/\s+/g,"").toLowerCase();}
+      uiDialog({
+        title:"设置通关密码",
+        body:"输入新的通关密码（数字或字母，1-12 位，不区分大小写），两行各输一次：",
+        fields:[
+          {label:"新通关密码",type:"password",placeholder:"输入新密码"},
+          {label:"确认新通关密码",type:"password",placeholder:"再输入一次相同的密码"}
+        ],
+        okText:"确认修改",
+        validate:function(v){
+          var a=norm(v[0]),b=norm(v[1]);
+          if(!a||a.length>12)return "通关密码需 1-12 位数字或字母";
+          if(a!==b)return "两次输入的密码不一致，请检查后重新输入";
+          return null;
+        }
+      }).then(function(v){
+        if(v===null)return;
+        var p=norm(v[0]);
+        makeAuthBlob(p,{pass:p}).then(function(r){ // PBKDF2+AES-GCM 加密，仓库里不存明文
+          var g=store.gate||{};
+          store.gate={seq:g.seq||gateDef().seq,keys:g.keys||gateDef().keys,sec:r.blob};
+          gateReset();konamiReset();persist();renderMineSecurity();
+          toast("通关密码已加密更新，同步后全设备生效","ok");
+        }).catch(function(){toast("加密失败，请重试","err");});
       });
     }
     function gateRecordSeq(){ // 录制点击手势
