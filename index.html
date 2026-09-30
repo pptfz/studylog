@@ -405,8 +405,7 @@
       </div>
       <div class="row spread edit-only" style="margin-bottom:8px"><span class="small muted">秘密通道</span><span class="small" id="sec-gate">默认</span></div>
       <div class="row edit-only" style="gap:10px;margin-bottom:12px">
-        <button class="btn btn-line" id="sec-gate-pass" style="flex:1">改通关密码</button>
-        <button class="btn btn-line" id="sec-gate-seq" style="flex:1">录点击顺序</button>
+        <button class="btn btn-line" id="sec-gate-pass" style="flex:1">设置 / 重置通关密码</button>
       </div>
       <div class="row edit-only" style="gap:10px">
         <button class="btn btn-line" id="sec-pin-btn" style="flex:1">本地口令（可选）</button>
@@ -832,25 +831,17 @@
     });
   }
   function gateDef(){
-    var D={pass:"HLX666",seq:["蟹","d","发"]}; // 默认：蟹→d→发（后台改一次密码即整体加密）
-    var LEG={"g1":"蟹","gand":"d","g2":"发"}; // 旧版整词顺序迁移
-    var CH="厚礼蟹and王德发";
-    var g=store.gate,seq=null,pass=null;
-    function norm(arr){
-      var ok=(arr||[]).map(function(x){return (typeof x==="string"&&LEG[x])?LEG[x]:x;});
-      ok=ok.filter(function(x){return typeof x==="string"&&x.length===1&&CH.indexOf(x)>=0;});
-      return (ok.length===(arr||[]).length&&ok.length>=2&&ok.length<=9)?ok:null;
-    }
-    if(!g)return {seq:D.seq,pass:D.pass,sec:false};
-    if(Array.isArray(g.seq))seq=norm(g.seq);
-    if(typeof g.pass==="string"&&g.pass)pass=g.pass;
-    if(g.sec&&g.sec.enc)return {seq:seq,pass:null,sec:true}; // 全加密：密码+顺序都在密文里
-    return {seq:seq||D.seq,pass:pass||D.pass,sec:false};
+    var D={pass:"HLX666"}; // 默认通关密码（后台改过即加密存储）
+    var g=store.gate;
+    if(!g)return {pass:D.pass,sec:false};
+    if(g.sec&&g.sec.enc)return {pass:null,sec:true}; // 已加密：密码在密文里
+    if(typeof g.pass==="string"&&g.pass)return {pass:g.pass,sec:false}; // 旧版明文
+    return {pass:D.pass,sec:false};
   }
-  function gateMigrateLegacy(){ // 管理员登录后：明文通关密码+顺序整体升级为 AES-GCM 加密
-    var g=store.gate,d=gateDef();
+  function gateMigrateLegacy(){ // 管理员登录后：明文通关密码升级为 AES-GCM 加密
+    var g=store.gate;
     if(!g||!g.pass||g.sec)return;
-    makeAuthBlob(g.pass.toLowerCase(),{pass:g.pass.toLowerCase(),seq:d.seq}).then(function(r){
+    makeAuthBlob(g.pass.toLowerCase(),{pass:g.pass.toLowerCase()}).then(function(r){
       if(store.gate&&store.gate.pass===g.pass&&!store.gate.sec){
         store.gate={sec:r.blob};
         persist();
@@ -871,12 +862,8 @@
     var gateEl=$("sec-gate");
     if(gateEl){
       var gd=gateDef();
-      if(gd.sec){
-        gateEl.textContent=gd.seq?("密码已加密 · 顺序未加密"):"已全部加密 🔒";
-      }else{
-        var seqTxt=(store.gate&&Array.isArray(store.gate.seq)&&store.gate.seq.join("")!=="蟹d发")?("自定义「"+gd.seq.join("")+"」"):"默认顺序";
-        gateEl.textContent=gd.pass+" · "+seqTxt+(store.gate&&store.gate.pass?"（未加密）":"");
-      }
+      if(gd.sec)gateEl.textContent="已加密 🔒";
+      else gateEl.textContent=gd.pass+(store.gate&&store.gate.pass?"（未加密）":"");
     }
     var outBtn=$("sec-logout");if(outBtn)outBtn.textContent=canEdit()?"退出登录":"管理员登录";
   }
@@ -2189,11 +2176,10 @@
     $("lk-mfa").addEventListener("keydown",function(e){if(e.key==="Enter")lockVerify();});
     /* ---------- 秘密通道：按序点击品牌字唤起管理员登录（顺序与通关密码可在管理后台自定义） ---------- */
     var GATE_WINDOW=3000;
-    var gateStep=0,gateTimer=null,gateBuf=[];
-    function gateReset(){gateStep=0;gateBuf=[];if(gateTimer){clearTimeout(gateTimer);gateTimer=null;}}
-    function gateBufPush(ch){gateBuf.push(ch);if(gateBuf.length>9)gateBuf.shift();}
+    var GATE_SEQ=["蟹","d","发"]; // 固定触发序列（公开手势）：依次点击 厚礼蟹 的 蟹 → and 的 d → 王德发 的 发
+    var gateStep=0,gateTimer=null;
+    function gateReset(){gateStep=0;if(gateTimer){clearTimeout(gateTimer);gateTimer=null;}}
     function gateOpen(){
-      var seqTry=gateBuf.slice();gateBuf=[];
       gateReset();
       var buf="";
       var rows=[["1","2","3","4","5","6"],["7","8","9","0","CLR","DEL"],["Q","W","E","R","T","Y"],["U","I","O","P","A","S"],["D","F","G","H","J","K"],["L","Z","X","C","V","B"],[null,null,"N","M"]];
@@ -2238,17 +2224,11 @@
       function submit(){
         if(!buf)return;
         var g=store.gate;
-        if(g&&g.sec&&g.sec.enc){ // 整体加密：AES-GCM 解密成功=密码正确，再核对点击顺序
+        if(g&&g.sec&&g.sec.enc){ // 加密通关密码：AES-GCM 解密成功即密码正确
           deriveAuthBits(buf.toLowerCase(),b64ToBytes(g.sec.salt),g.sec.iter||AUTH_ITER)
             .then(importAesKey)
             .then(function(key){return aesDecrypt(key,g.sec.enc.iv,g.sec.enc.data);})
-            .then(function(payload){
-              if(payload&&Array.isArray(payload.seq)){
-                var tail=seqTry.slice(-payload.seq.length);
-                if(tail.join("")!==payload.seq.join("")){shakeWrong();return;}
-              }
-              close();toast("通道开启，欢迎回来","ok");showLock("");
-            })
+            .then(function(){close();toast("通道开启，欢迎回来","ok");showLock("");})
             .catch(shakeWrong);
           return;
         }
@@ -2291,120 +2271,33 @@
             e.stopPropagation();
             if(canEdit())return;
             var ch=el.getAttribute("data-ch");
-            var def=gateDef();
-            if(!def.seq){ // 全加密模式：顺序在密文里，先缓冲，点品牌图标提交
-              gateBufPush(ch);
-              return;
-            }
-            var seq=def.seq;
-            if(seq[gateStep]!==ch){gateReset();return;}
+            if(GATE_SEQ[gateStep]!==ch){gateReset();return;}
             gateStep++;
-            gateBufPush(ch);
             if(gateTimer)clearTimeout(gateTimer);
             gateTimer=setTimeout(gateReset,GATE_WINDOW);
-            if(gateStep===seq.length)gateOpen();
+            if(gateStep===GATE_SEQ.length)gateOpen();
           });
         })(chars[ci]);
       }
-      var icons=document.querySelectorAll(".brand svg");
-      for(var vi=0;vi<icons.length;vi++){
-        (function(el){
-          el.addEventListener("click",function(e){
-            e.stopPropagation();
-            if(canEdit())return;
-            if(gateDef().seq)return; // 顺序明文模式：点完字自动弹出，用不到图标
-            if(gateBuf.length>=2)gateOpen(); // 全加密模式：点完顺序点图标提交
-          });
-        })(icons[vi]);
-      }
     })();
-    function gateChangePass(){
+    function gateChangePass(){ // 管理员直接重设通关密码（忘记旧密码也能重置）
       if(!requireEdit())return;
-      var g=store.gate;
-      function setNew(oldPayload){
-        uiPrompt("设置新通关密码","输入新的通关密码（数字或字母，1-12 位，不区分大小写）：",{type:"password"}).then(function(p){
-          if(p===null)return;
-          p=String(p).trim().replace(/\s+/g,"").toLowerCase();
-          if(!p||p.length>12){toast("通关密码需 1-12 位数字或字母","err");return;}
-          var seq=(oldPayload&&Array.isArray(oldPayload.seq))?oldPayload.seq:gateDef().seq;
-          makeAuthBlob(p,{pass:p,seq:seq}).then(function(r){ // 密码+顺序整体加密
-            store.gate={sec:r.blob};
-            gateReset();gateBuf=[];persist();renderMineSecurity();
-            toast("通关密码已加密更新，同步后全设备生效","ok");
-          }).catch(function(){toast("加密失败，请重试","err");});
-        });
-      }
-      if(g&&g.sec&&g.sec.enc){ // 已加密：需先验证当前通关密码（防他人顺手改掉）
-        uiPrompt("验证当前通关密码","输入当前通关密码以继续：",{type:"password"}).then(function(cur){
-          if(cur===null)return;
-          cur=String(cur).trim().replace(/\s+/g,"").toLowerCase();
-          if(!cur){toast("请输入当前通关密码","err");return;}
-          deriveAuthBits(cur,b64ToBytes(g.sec.salt),g.sec.iter||AUTH_ITER)
-            .then(importAesKey)
-            .then(function(key){return aesDecrypt(key,g.sec.enc.iv,g.sec.enc.data);})
-            .then(function(payload){setNew(payload);})
-            .catch(function(){toast("当前通关密码不正确","err");});
-        });
-        return;
-      }
-      setNew(null);
-    }
-    function gateRecordSeq(){
-      if(!requireEdit())return;
-      if(document.getElementById("gate-rec"))return;
-      var g=store.gate;
-      function startRecording(oldPayload){
-        var steps=[];
-        var bar=document.createElement("div");
-        bar.id="gate-rec";
-        bar.style.cssText="position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:120;display:flex;gap:10px;align-items:center;background:var(--purpleSoft);color:var(--purple);font-size:13px;font-weight:700;padding:10px 14px;border-radius:14px;box-shadow:0 6px 24px rgba(0,0,0,.15);white-space:nowrap";
-        bar.innerHTML='<span id="gate-rec-tip">录制中：依次点击品牌单字（至少 2 步，至多 9 步）· 已录 0 步</span>'+
-          '<button class="btn btn-primary" id="gate-rec-done" style="padding:6px 14px">完成</button>'+
-          '<button class="btn btn-line" id="gate-rec-cancel" style="padding:6px 14px">取消</button>';
-        document.body.appendChild(bar);
-        function tip(){var t=document.getElementById("gate-rec-tip");if(t)t.textContent="录制中：依次点击品牌单字（至少 2 步，至多 9 步）· 已录 "+steps.length+" 步";}
-        function onRec(e){
-          var el=e.target.closest?e.target.closest(".gch"):null;
-          if(!el)return;
-          var ch=el.getAttribute("data-ch");
-          if(!ch)return;
-          if(steps.length>=9){toast("最多 9 步，点「完成」结束录制","err");return;}
-          steps.push(ch);tip();
-        }
-        function cleanup(){document.removeEventListener("click",onRec,true);if(bar.parentNode)bar.parentNode.removeChild(bar);}
-        document.addEventListener("click",onRec,true);
-        document.getElementById("gate-rec-cancel").onclick=function(){cleanup();toast("已取消录制，顺序未改动","ok");};
-        document.getElementById("gate-rec-done").onclick=function(){
-          if(steps.length<2){toast("至少录制 2 步","err");return;}
-          var pass=(oldPayload&&oldPayload.pass)?oldPayload.pass:gateDef().pass;
-          makeAuthBlob(pass.toLowerCase(),{pass:pass.toLowerCase(),seq:steps.slice()}).then(function(r){ // 密码+新顺序整体加密
-            store.gate={sec:r.blob};
-            gateReset();gateBuf=[];cleanup();persist();renderMineSecurity();
-            toast("点击顺序已加密更新，同步后全设备生效","ok");
-          }).catch(function(){toast("加密失败，请重试","err");});
-        };
-      }
-      if(g&&g.sec&&g.sec.enc){ // 已加密：需先验证当前通关密码（解出旧密码才能重加密）
-        uiPrompt("验证当前通关密码","输入当前通关密码以继续：",{type:"password"}).then(function(cur){
-          if(cur===null)return;
-          cur=String(cur).trim().replace(/\s+/g,"").toLowerCase();
-          if(!cur){toast("请输入当前通关密码","err");return;}
-          deriveAuthBits(cur,b64ToBytes(g.sec.salt),g.sec.iter||AUTH_ITER)
-            .then(importAesKey)
-            .then(function(key){return aesDecrypt(key,g.sec.enc.iv,g.sec.enc.data);})
-            .then(function(payload){startRecording(payload);})
-            .catch(function(){toast("当前通关密码不正确","err");});
-        });
-        return;
-      }
-      startRecording(null);
+      uiPrompt("设置通关密码","输入新的通关密码（数字或字母，1-12 位，不区分大小写）：",{type:"password"}).then(function(p){
+        if(p===null)return;
+        p=String(p).trim().replace(/\s+/g,"").toLowerCase();
+        if(!p||p.length>12){toast("通关密码需 1-12 位数字或字母","err");return;}
+        makeAuthBlob(p,{pass:p}).then(function(r){ // PBKDF2+AES-GCM 加密，仓库里不存明文
+          store.gate={sec:r.blob};
+        gateReset();persist();renderMineSecurity();
+          toast("通关密码已加密更新，同步后全设备生效","ok");
+        }).catch(function(){toast("加密失败，请重试","err");});
+      });
     }
     $("sec-logout").onclick=function(){if(canEdit())logout();else goLogin();};
     $("sec-pass-btn").onclick=setupLoginPassword;
     $("sec-pin-btn").onclick=setupPin;
     $("sec-mfa-btn").onclick=setupMfa;
     $("sec-gate-pass").onclick=gateChangePass;
-    $("sec-gate-seq").onclick=gateRecordSeq;
     $("sec-days").onchange=function(){
       try{localStorage.setItem(SESS_KEY,this.value);}catch(e){}
       var u=readUnlock();
