@@ -405,7 +405,9 @@
       </div>
       <div class="row spread edit-only" style="margin-bottom:8px"><span class="small muted">秘密通道</span><span class="small" id="sec-gate">默认</span></div>
       <div class="row edit-only" style="gap:10px;margin-bottom:12px">
-        <button class="btn btn-line" id="sec-gate-pass" style="flex:1">设置 / 重置通关密码</button>
+        <button class="btn btn-line" id="sec-gate-pass" style="flex:1">改通关密码</button>
+        <button class="btn btn-line" id="sec-gate-seq" style="flex:1">设点击手势</button>
+        <button class="btn btn-line" id="sec-gate-keys" style="flex:1">设键盘手势</button>
       </div>
       <div class="row edit-only" style="gap:10px">
         <button class="btn btn-line" id="sec-pin-btn" style="flex:1">本地口令（可选）</button>
@@ -830,20 +832,36 @@
       bootstrap(); // 以访客身份匿名重新读取
     });
   }
+  var GATE_KONAMI=["ArrowUp","ArrowUp","ArrowDown","ArrowDown","ArrowLeft","ArrowRight","ArrowLeft","ArrowRight"]; // 默认键盘手势 ↑↑↓↓←→←→
   function gateDef(){
-    var D={pass:"HLX666"}; // 默认通关密码（后台改过即加密存储）
+    var D={pass:"HLX666",seq:["蟹","d","发"],keys:GATE_KONAMI.slice()};
+    var LEG={"g1":"蟹","gand":"d","g2":"发"}; // 旧版整词顺序迁移
+    var CH="厚礼蟹and王德发";
+    var AR={"ArrowUp":1,"ArrowDown":1,"ArrowLeft":1,"ArrowRight":1};
     var g=store.gate;
-    if(!g)return {pass:D.pass,sec:false};
-    if(g.sec&&g.sec.enc)return {pass:null,sec:true}; // 已加密：密码在密文里
-    if(typeof g.pass==="string"&&g.pass)return {pass:g.pass,sec:false}; // 旧版明文
-    return {pass:D.pass,sec:false};
+    function normCh(arr){
+      var ok=(arr||[]).map(function(x){return (typeof x==="string"&&LEG[x])?LEG[x]:x;});
+      ok=ok.filter(function(x){return typeof x==="string"&&x.length===1&&CH.indexOf(x)>=0;});
+      return (ok.length===(arr||[]).length&&ok.length>=2&&ok.length<=9)?ok:null;
+    }
+    function normKeys(arr){
+      var ok=(arr||[]).map(function(x){return AR[x]?x:((x==="b"||x==="B")?"b":((x==="a"||x==="A")?"a":null));});
+      ok=ok.filter(function(x){return !!x;});
+      return (ok.length===(arr||[]).length&&ok.length>=2&&ok.length<=12)?ok:null;
+    }
+    if(!g)return {seq:D.seq,keys:D.keys,pass:D.pass,sec:false};
+    var seq=Array.isArray(g.seq)?normCh(g.seq):null;
+    var keys=Array.isArray(g.keys)?normKeys(g.keys):null;
+    var pass=(typeof g.pass==="string"&&g.pass)?g.pass:null;
+    if(g.sec&&g.sec.enc)return {seq:seq||D.seq,keys:keys||D.keys,pass:null,sec:true};
+    return {seq:seq||D.seq,keys:keys||D.keys,pass:pass||D.pass,sec:false};
   }
   function gateMigrateLegacy(){ // 管理员登录后：明文通关密码升级为 AES-GCM 加密
     var g=store.gate;
     if(!g||!g.pass||g.sec)return;
     makeAuthBlob(g.pass.toLowerCase(),{pass:g.pass.toLowerCase()}).then(function(r){
       if(store.gate&&store.gate.pass===g.pass&&!store.gate.sec){
-        store.gate={sec:r.blob};
+        store.gate={seq:store.gate.seq||[],keys:store.gate.keys||[],sec:r.blob};
         persist();
         renderMineSecurity();
       }
@@ -862,8 +880,9 @@
     var gateEl=$("sec-gate");
     if(gateEl){
       var gd=gateDef();
-      if(gd.sec)gateEl.textContent="已加密 🔒";
-      else gateEl.textContent=gd.pass+(store.gate&&store.gate.pass?"（未加密）":"");
+      var isDefSeq=gd.seq.join("")==="蟹d发";
+      var isDefKeys=gd.keys.join("")===GATE_KONAMI.join("");
+      gateEl.textContent=(gd.sec?"已加密":"未加密")+" · 点击手势"+(isDefSeq?"默认":"自定义")+" · 键盘手势"+(isDefKeys?"默认":"自定义");
     }
     var outBtn=$("sec-logout");if(outBtn)outBtn.textContent=canEdit()?"退出登录":"管理员登录";
   }
@@ -959,15 +978,15 @@
       '<div class="row" style="gap:10px;margin-top:12px"><button class="btn btn-primary" id="mfa-ok" style="flex:1">确认绑定</button><button class="btn btn-line" id="mfa-cancel" style="flex:1">取消</button></div>'+
       '</div></div>';
     document.body.insertAdjacentHTML("beforeend",html);
-    var mask=$("mask");
+    var mask=document.body.lastElementChild; // 直接捕获刚插入的弹窗（避免与残留的同 id 弹窗串绑）
     if(window.QRCode){
-      try{new QRCode($("mfa-qr"),{text:uri,width:170,height:170,correctLevel:QRCode.CorrectLevel.M});}
-      catch(e){$("mfa-qr").textContent="二维码生成失败，请用下面的手动输入方式";}
+      try{new QRCode(mask.querySelector("#mfa-qr"),{text:uri,width:170,height:170,correctLevel:QRCode.CorrectLevel.M});}
+      catch(e){mask.querySelector("#mfa-qr").textContent="二维码生成失败，请用下面的手动输入方式";}
     }
-    $("mfa-cancel").onclick=closeModal;
+    mask.querySelector("#mfa-cancel").onclick=closeModal;
     mask.onclick=function(e){if(e.target===mask)closeModal();};
-    $("mfa-ok").onclick=function(){
-      mfaCheckInput($("mfa-code").value).then(function(ok){
+    mask.querySelector("#mfa-ok").onclick=function(){
+      mfaCheckInput(mask.querySelector("#mfa-code").value).then(function(ok){
         if(!ok){toast("验证码不正确，请重看 App 上的数字","err");return;}
         writeMfa(secret);mfaResetFail();closeModal();toast("两步验证已开启","ok");renderMineSecurity();authSync().catch(function(){});
       }).catch(function(e){toast("校验失败："+(e&&e.message||"环境不支持"),"err");});
@@ -1131,13 +1150,13 @@
         '<div class="row" style="gap:10px;margin-top:12px"><button class="btn '+(cfg.danger?"btn-danger":"btn-primary")+'" id="ui-ok" style="flex:1">'+esc(cfg.okText||"确定")+'</button><button class="btn btn-line" id="ui-cancel" style="flex:1">取消</button></div>'+
         '</div></div>';
       document.body.insertAdjacentHTML("beforeend",html);
-      var mask=$("mask");
+      var mask=document.body.lastElementChild; // 直接捕获刚插入的弹窗（避免与残留的同 id 弹窗串绑）
       function close(v){if(mask.parentNode)mask.parentNode.removeChild(mask);resolve(v);}
-      $("ui-cancel").onclick=function(){close(null);};
+      mask.querySelector("#ui-cancel").onclick=function(){close(null);};
       mask.onclick=function(e){if(e.target===mask)close(null);};
-      $("ui-ok").onclick=function(){close(fields.map(function(f,i){return $("ui-f"+i).value;}));};
-      if(fields[0])$("ui-f0").focus();
-      fields.forEach(function(f,i){$("ui-f"+i).addEventListener("keydown",function(e){if(e.key==="Enter")$("ui-ok").click();});});
+      mask.querySelector("#ui-ok").onclick=function(){close(fields.map(function(f,i){return mask.querySelector("#ui-f"+i).value;}));};
+      if(fields[0])mask.querySelector("#ui-f0").focus();
+      fields.forEach(function(f,i){mask.querySelector("#ui-f"+i).addEventListener("keydown",function(e){if(e.key==="Enter")mask.querySelector("#ui-ok").click();});});
     });
   }
   function uiPrompt(title,label,opts){opts=opts||{};
@@ -1770,10 +1789,11 @@
       '<div id="statcard-list">'+rows+'</div>'+
       '<div class="row" style="gap:10px;margin-top:12px"><button class="btn btn-primary" id="sc-save" style="flex:1">保存</button><button class="btn btn-line" id="sc-cancel" style="flex:1">取消</button></div></div></div>';
     document.body.insertAdjacentHTML("beforeend",html);
-    var mask=$("mask");$("sc-cancel").onclick=closeModal;mask.onclick=function(e){if(e.target===mask)closeModal();};
-    $("sc-save").onclick=function(){
+    var mask=document.body.lastElementChild; // 直接捕获刚插入的弹窗（避免与残留的同 id 弹窗串绑）
+    mask.querySelector("#sc-cancel").onclick=closeModal;mask.onclick=function(e){if(e.target===mask)closeModal();};
+    mask.querySelector("#sc-save").onclick=function(){
       var sel=[];
-      $("statcard-list").querySelectorAll("input:checked").forEach(function(c){sel.push(c.value);});
+      mask.querySelector("#statcard-list").querySelectorAll("input:checked").forEach(function(c){sel.push(c.value);});
       if(!sel.length){toast("至少勾选一个指标","err");return;}
       writeStatCards(sel);closeModal();renderStats();toast("指标已更新","ok");
     };
@@ -1979,7 +1999,8 @@
       '<div class="row" style="gap:10px;margin-top:6px"><button class="btn btn-primary" id="m-save" style="flex:1">保存</button><button class="btn btn-line" id="m-cancel" style="flex:1">取消</button></div>'+
       '</div></div>';
     document.body.insertAdjacentHTML("beforeend",html);
-    var mask=$("mask");
+    var mask=document.body.lastElementChild; // 直接捕获刚插入的弹窗（避免与残留的同 id 弹窗串绑）
+    function $(id){return mask.querySelector("#"+id);} // 局部覆盖全局 $：函数内所有查找都指向本弹窗
     $("m-cancel").onclick=closeModal;
     mask.onclick=function(e){if(e.target===mask)closeModal();};
     var selColor=color;
@@ -2016,13 +2037,15 @@
       '<textarea id="m-text" style="width:100%;min-height:200px">'+esc(txt)+'</textarea>'+
       '<div class="row" style="gap:10px;margin-top:12px"><button class="btn btn-primary" id="m-copy" style="flex:1">复制</button><button class="btn btn-line" id="m-close" style="flex:1">关闭</button></div></div></div>';
     document.body.insertAdjacentHTML("beforeend",html);
-    var mask=$("mask");$("m-close").onclick=closeModal;mask.onclick=function(e){if(e.target===mask)closeModal();};
+    var mask=document.body.lastElementChild; // 直接捕获刚插入的弹窗（避免与残留的同 id 弹窗串绑）
+    function $(id){return mask.querySelector("#"+id);} // 局部覆盖全局 $：函数内所有查找都指向本弹窗
+    $("m-close").onclick=closeModal;mask.onclick=function(e){if(e.target===mask)closeModal();};
     $("m-copy").onclick=function(){
       var ta=$("m-text");ta.select();
       try{document.execCommand("copy");toast("已复制","ok");}catch(e){toast("请手动复制","err");}
     };
   }
-  function closeModal(){var m=$("mask");if(m)m.parentNode.removeChild(m);}
+  function closeModal(){document.querySelectorAll("body > .mask").forEach(function(m){m.parentNode.removeChild(m);});} // 清除全部弹窗（防止残留僵尸 mask 吞事件）
 
   /* ---------- actions ---------- */
   function doCheckin(id){
@@ -2176,9 +2199,10 @@
     $("lk-mfa").addEventListener("keydown",function(e){if(e.key==="Enter")lockVerify();});
     /* ---------- 秘密通道：按序点击品牌字唤起管理员登录（顺序与通关密码可在管理后台自定义） ---------- */
     var GATE_WINDOW=3000;
-    var GATE_SEQ=["蟹","d","发"]; // 固定触发序列（公开手势）：依次点击 厚礼蟹 的 蟹 → and 的 d → 王德发 的 发
     var gateStep=0,gateTimer=null;
     function gateReset(){gateStep=0;if(gateTimer){clearTimeout(gateTimer);gateTimer=null;}}
+    var konamiStep=0,konamiTimer=null;
+    function konamiReset(){konamiStep=0;if(konamiTimer){clearTimeout(konamiTimer);konamiTimer=null;}}
     function gateOpen(){
       gateReset();
       var buf="";
@@ -2200,7 +2224,7 @@
         '<div class="row" style="gap:10px;margin-top:14px"><button class="btn btn-primary" id="gate-ok" style="flex:1">解锁</button><button class="btn btn-line" id="gate-cancel" style="flex:1">取消</button></div>'+
         '</div></div>';
       document.body.insertAdjacentHTML("beforeend",html);
-      var mask=$("mask"),dots=$("gate-dots");
+      var mask=document.body.lastElementChild,dots=mask.querySelector("#gate-dots"); // 直接捕获刚插入的弹窗（避免与残留的同 id 弹窗串绑）
       function render(){
         if(!buf){dots.innerHTML='<span class="gate-hint">请输入通关密码</span>';return;}
         var s="";for(var i=0;i<buf.length;i++)s+="●";
@@ -2236,8 +2260,8 @@
         else shakeWrong();
       }
       mask.addEventListener("click",function(e){if(e.target===mask)close();});
-      $("gate-cancel").onclick=close;
-      $("gate-ok").onclick=submit;
+      mask.querySelector("#gate-cancel").onclick=close;
+      mask.querySelector("#gate-ok").onclick=submit;
       mask.querySelector(".gate-pad").addEventListener("click",function(e){
         var b=e.target.closest("button[data-k]");if(!b)return;
         var k=b.getAttribute("data-k");
@@ -2271,33 +2295,121 @@
             e.stopPropagation();
             if(canEdit())return;
             var ch=el.getAttribute("data-ch");
-            if(GATE_SEQ[gateStep]!==ch){gateReset();return;}
+            var seq=gateDef().seq;
+            if(seq[gateStep]!==ch){gateReset();return;}
             gateStep++;
             if(gateTimer)clearTimeout(gateTimer);
             gateTimer=setTimeout(gateReset,GATE_WINDOW);
-            if(gateStep===GATE_SEQ.length)gateOpen();
+            if(gateStep===seq.length)gateOpen();
           });
         })(chars[ci]);
       }
-    })();
-    function gateChangePass(){ // 管理员直接重设通关密码（忘记旧密码也能重置）
-      if(!requireEdit())return;
-      uiPrompt("设置通关密码","输入新的通关密码（数字或字母，1-12 位，不区分大小写）：",{type:"password"}).then(function(p){
-        if(p===null)return;
-        p=String(p).trim().replace(/\s+/g,"").toLowerCase();
-        if(!p||p.length>12){toast("通关密码需 1-12 位数字或字母","err");return;}
-        makeAuthBlob(p,{pass:p}).then(function(r){ // PBKDF2+AES-GCM 加密，仓库里不存明文
-          store.gate={sec:r.blob};
-        gateReset();persist();renderMineSecurity();
-          toast("通关密码已加密更新，同步后全设备生效","ok");
-        }).catch(function(){toast("加密失败，请重试","err");});
+      document.addEventListener("keydown",function(e){ // 键盘手势（Konami 类）：↑↑↓↓←→←→
+        if(canEdit())return;
+        if(document.querySelector(".mask"))return;
+        var lock=document.getElementById("lock");
+        if(lock&&!lock.classList.contains("hidden"))return;
+        var t=e.target&&e.target.tagName;
+        if(t==="INPUT"||t==="TEXTAREA"||t==="SELECT")return;
+        var keys=gateDef().keys;
+        var ek=(e.key==="ArrowUp"||e.key==="ArrowDown"||e.key==="ArrowLeft"||e.key==="ArrowRight")?e.key:((e.key==="b"||e.key==="B")?"b":((e.key==="a"||e.key==="A")?"a":null));
+        if(!ek){konamiReset();return;}
+        if(ek!==keys[konamiStep]){konamiReset();if(keys[0]===ek)konamiStep=1;return;}
+        if(e.key.indexOf("Arrow")===0)e.preventDefault();
+        konamiStep++;
+        if(konamiTimer)clearTimeout(konamiTimer);
+        konamiTimer=setTimeout(konamiReset,GATE_WINDOW*3);
+        if(konamiStep===keys.length)gateOpen();
       });
+    })();
+    function gateChangePass(){ // 管理员重设通关密码：新密码输入两次确认，AES-GCM 加密存储
+      if(!requireEdit())return;
+      uiPrompt("设置通关密码","输入新的通关密码（数字或字母，1-12 位，不区分大小写）：",{type:"password"}).then(function(p1){
+        if(p1===null)return;
+        p1=String(p1).trim().replace(/\s+/g,"").toLowerCase();
+        if(!p1||p1.length>12){toast("通关密码需 1-12 位数字或字母","err");return;}
+        uiPrompt("确认新通关密码","再输入一次相同的通关密码：",{type:"password"}).then(function(p2){
+          if(p2===null)return;
+          p2=String(p2).trim().replace(/\s+/g,"").toLowerCase();
+          if(p2!==p1){toast("两次输入不一致，请重试","err");return;}
+          makeAuthBlob(p1,{pass:p1}).then(function(r){ // PBKDF2+AES-GCM 加密，仓库里不存明文
+            var g=store.gate||{};
+            store.gate={seq:g.seq||gateDef().seq,keys:g.keys||gateDef().keys,sec:r.blob};
+            gateReset();konamiReset();persist();renderMineSecurity();
+            toast("通关密码已加密更新，同步后全设备生效","ok");
+          }).catch(function(){toast("加密失败，请重试","err");});
+        });
+      });
+    }
+    function gateRecordSeq(){ // 录制点击手势
+      if(!requireEdit())return;
+      if(document.getElementById("gate-rec"))return;
+      var steps=[];
+      var bar=document.createElement("div");
+      bar.id="gate-rec";
+      bar.style.cssText="position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:120;display:flex;gap:10px;align-items:center;background:var(--purpleSoft);color:var(--purple);font-size:13px;font-weight:700;padding:10px 14px;border-radius:14px;box-shadow:0 6px 24px rgba(0,0,0,.15);white-space:nowrap";
+      bar.innerHTML='<span id="gate-rec-tip">录制点击手势：依次点击品牌单字（至少 2 步，至多 9 步）· 已录 0 步</span>'+
+        '<button class="btn btn-primary" id="gate-rec-done" style="padding:6px 14px">完成</button>'+
+        '<button class="btn btn-line" id="gate-rec-cancel" style="padding:6px 14px">取消</button>';
+      document.body.appendChild(bar);
+      function tip(){var t=document.getElementById("gate-rec-tip");if(t)t.textContent="录制点击手势：依次点击品牌单字（至少 2 步，至多 9 步）· 已录 "+steps.length+" 步";}
+      function onRec(e){
+        var el=e.target.closest?e.target.closest(".gch"):null;
+        if(!el)return;
+        var ch=el.getAttribute("data-ch");
+        if(!ch)return;
+        if(steps.length>=9){toast("最多 9 步，点「完成」结束录制","err");return;}
+        steps.push(ch);tip();
+      }
+      function cleanup(){document.removeEventListener("click",onRec,true);if(bar.parentNode)bar.parentNode.removeChild(bar);}
+      document.addEventListener("click",onRec,true);
+      document.getElementById("gate-rec-cancel").onclick=function(){cleanup();toast("已取消录制，手势未改动","ok");};
+      document.getElementById("gate-rec-done").onclick=function(){
+        if(steps.length<2){toast("至少录制 2 步","err");return;}
+        var g=store.gate||{};
+        store.gate={seq:steps.slice(),keys:g.keys||gateDef().keys,sec:g.sec};
+        gateReset();cleanup();persist();renderMineSecurity();
+        toast("点击手势已更新，同步后全设备生效","ok");
+      };
+    }
+    function gateRecordKeys(){ // 录制键盘手势（方向键 + 可选 b/a）
+      if(!requireEdit())return;
+      if(document.getElementById("gate-rec"))return;
+      var steps=[];
+      var NAMES={ArrowUp:"↑",ArrowDown:"↓",ArrowLeft:"←",ArrowRight:"→",b:"B",a:"A"};
+      var bar=document.createElement("div");
+      bar.id="gate-rec";
+      bar.style.cssText="position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:120;display:flex;gap:10px;align-items:center;background:var(--purpleSoft);color:var(--purple);font-size:13px;font-weight:700;padding:10px 14px;border-radius:14px;box-shadow:0 6px 24px rgba(0,0,0,.15);white-space:nowrap";
+      bar.innerHTML='<span id="gate-rec-tip">录制键盘手势：依次按方向键（至少 2 步，至多 12 步）· 已录 0 步</span>'+
+        '<button class="btn btn-primary" id="gate-rec-done" style="padding:6px 14px">完成</button>'+
+        '<button class="btn btn-line" id="gate-rec-cancel" style="padding:6px 14px">取消</button>';
+      document.body.appendChild(bar);
+      function tip(){var t=document.getElementById("gate-rec-tip");if(t){var s=steps.map(function(x){return NAMES[x]||x;}).join("");t.textContent="录制键盘手势：依次按方向键（至少 2 步，至多 12 步）· 已录 "+steps.length+" 步 "+s;}}
+      function onKey(e){
+        var k=(e.key==="ArrowUp"||e.key==="ArrowDown"||e.key==="ArrowLeft"||e.key==="ArrowRight")?e.key:((e.key==="b"||e.key==="B")?"b":((e.key==="a"||e.key==="A")?"a":null));
+        if(!k)return;
+        e.preventDefault();
+        if(steps.length>=12){toast("最多 12 步，点「完成」结束录制","err");return;}
+        steps.push(k);tip();
+      }
+      function cleanup(){document.removeEventListener("keydown",onKey,true);if(bar.parentNode)bar.parentNode.removeChild(bar);}
+      document.addEventListener("keydown",onKey,true);
+      document.getElementById("gate-rec-cancel").onclick=function(){cleanup();toast("已取消录制，手势未改动","ok");};
+      document.getElementById("gate-rec-done").onclick=function(){
+        if(steps.length<2){toast("至少录制 2 步","err");return;}
+        var g=store.gate||{};
+        store.gate={seq:g.seq||gateDef().seq,keys:steps.slice(),sec:g.sec};
+        konamiReset();cleanup();persist();renderMineSecurity();
+        toast("键盘手势已更新，同步后全设备生效","ok");
+      };
     }
     $("sec-logout").onclick=function(){if(canEdit())logout();else goLogin();};
     $("sec-pass-btn").onclick=setupLoginPassword;
     $("sec-pin-btn").onclick=setupPin;
     $("sec-mfa-btn").onclick=setupMfa;
     $("sec-gate-pass").onclick=gateChangePass;
+    $("sec-gate-seq").onclick=gateRecordSeq;
+    $("sec-gate-keys").onclick=gateRecordKeys;
     $("sec-days").onchange=function(){
       try{localStorage.setItem(SESS_KEY,this.value);}catch(e){}
       var u=readUnlock();
