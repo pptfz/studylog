@@ -227,16 +227,45 @@
   .tl-dot{width:9px;height:9px;border-radius:3px;flex:none}
   .tl-name{flex:1}
   .tl-theme{font-size:12px;color:var(--muted2);font-weight:600}
-  .dist-row{display:flex;align-items:center;gap:10px;margin-bottom:9px}
-  .dist-name{width:110px;flex:none;font-size:13px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .dist-bar{flex:1;height:8px;border-radius:6px;background:var(--bg);overflow:hidden}
-  .dist-fill{height:100%;border-radius:6px}
-  .dist-n{width:52px;flex:none;text-align:right;font-size:13px;font-weight:800;color:var(--text)}
+  .dist-row{margin-bottom:11px}
+  .dist-top{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:5px}
+  .dist-name{font-size:13px;font-weight:700;color:var(--text);word-break:break-all}
+  .dist-bar{display:block;height:8px;border-radius:6px;background:var(--bg);overflow:hidden}
+  .dist-fill{display:block;height:100%;border-radius:6px}
+  .dist-n{flex:none;font-size:13px;font-weight:800;color:var(--text)}
   .master-row{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--line);font-size:14px}
   .master-row:last-child{border-bottom:none}
   .master-theme{flex:1;font-weight:700}
   .master-n{font-weight:800;color:var(--muted)}
-  .master-todo{font-size:12px;color:var(--muted2);padding:4px 0 10px;line-height:1.7}
+  .master-todo{font-size:12.5px;color:var(--text);padding:8px 0 10px;line-height:1.6;border-top:1px dashed var(--line);margin-top:2px;columns:2;column-gap:34px}
+  @media (max-width:767px){.master-todo{columns:1}}
+  .master-todo .kw-group{break-after:avoid;page-break-after:avoid}
+  .mt-item{display:flex;align-items:baseline;gap:6px;padding:2.5px 0;break-inside:avoid}
+  .mt-item:before{content:"";width:6px;height:6px;border-radius:50%;border:1.5px solid var(--muted2);flex:none;transform:translateY(-1px)}
+  .tdone-sum{font-size:13px;color:var(--muted);margin-bottom:8px}
+  .tdone-sum b{color:var(--text);font-weight:800}
+
+  /* ===== 右侧信息栏：时钟 + 日历（≥1280px 显示） ===== */
+  .rail{display:none}
+  @media (min-width:1280px){
+    .rail{display:block;position:fixed;top:0;right:0;bottom:0;width:252px;padding:26px 20px;overflow-y:auto;z-index:20}
+    .main{margin-right:268px}
+  }
+  .rail-card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px;margin-bottom:14px}
+  .rail-time{font-size:34px;font-weight:800;color:var(--text);letter-spacing:.02em;font-variant-numeric:tabular-nums;line-height:1.1}
+  .rail-date{font-size:13px;color:var(--muted);font-weight:700;margin-top:4px}
+  .cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+  .cal-title{font-weight:800;font-size:14px;color:var(--text)}
+  .cal-btn{width:28px;height:28px;border-radius:9px;border:1px solid var(--line);background:#fff;color:var(--muted);font-size:17px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.12s;padding:0}
+  .cal-btn:hover{color:var(--purple);border-color:var(--purple)}
+  .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;text-align:center}
+  .cal-wd{font-size:11px;color:var(--muted2);font-weight:700;padding:4px 0}
+  .cal-d{position:relative;font-size:12.5px;padding:6px 0 8px;border-radius:8px;color:var(--text);font-weight:600}
+  .cal-d.dim{color:var(--muted2);opacity:.5}
+  .cal-d.today{background:var(--purple);color:#fff;font-weight:800}
+  .cal-d .studied{position:absolute;left:50%;transform:translateX(-50%);bottom:2px;width:4px;height:4px;border-radius:50%;background:var(--green)}
+  .cal-d.today .studied{background:#fff}
+  .cal-tip{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted2);margin-top:10px;font-weight:600}
   .statcard-opt{display:flex;align-items:center;gap:9px;padding:11px 4px;border-bottom:1px solid var(--line);font-size:15px;font-weight:600;cursor:pointer}
   .statcard-opt:last-child{border-bottom:none}
   .statcard-opt input{width:20px;height:20px;accent-color:var(--purple);flex:none}
@@ -310,11 +339,29 @@
   <button class="navbtn" data-tab="mine"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="2"/><path d="M4 20c0-4 4-6 8-6s8 2 8 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>我的</button>
 </div>
 
+<div class="rail" id="rail">
+  <div class="rail-card rail-clock">
+    <div class="rail-time" id="rail-time">--:--:--</div>
+    <div class="rail-date" id="rail-date">—</div>
+  </div>
+  <div class="rail-card">
+    <div class="cal-head">
+      <button class="cal-btn" id="cal-prev" title="上个月">‹</button>
+      <div class="cal-title" id="cal-title">—</div>
+      <button class="cal-btn" id="cal-next" title="下个月">›</button>
+    </div>
+    <div class="cal-grid" id="cal-grid"></div>
+    <div class="cal-tip"><span class="studied" style="position:static;transform:none"></span>有学习记录的日子</div>
+  </div>
+</div>
+
 <div class="main">
   <!-- TODAY -->
   <section class="tab active" id="tab-today">
     <div class="brand"><svg viewBox="0 0 24 24" fill="none"><path d="M4 5h16v14H4z" stroke="#7C5CFF" stroke-width="2" stroke-linejoin="round"/><path d="M8 9h8M8 13h5" stroke="#9D7BFF" stroke-width="2" stroke-linecap="round"/></svg><span class="gname g1">厚礼蟹</span><span class="gname gand">and</span><span class="gname g2">王德发</span></div>
     <button class="btn btn-primary btn-block edit-only" id="new-goal-top"><svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/></svg>新建学习主题</button>
+    <div class="section-title">今日所学</div>
+    <div id="today-done"></div>
     <div class="section-title">今天要处理</div>
     <div id="today-handle"></div>
     <div class="section-title">可直接打卡</div>
@@ -1447,7 +1494,35 @@
   }
 
   /* ---------- render: TODAY ---------- */
+  function renderTodayDone(){
+    var el=$("today-done");if(!el)return;
+    var todayK=fmtDate(todayMid());
+    var rows=[];
+    state.goals.forEach(function(g){
+      if(!isListGoal(g))return;
+      var color=g["配色"]||"#7C5CFF";
+      listOf(g).forEach(function(x){
+        if(x.d===todayK)rows.push({color:color,name:x.n,theme:g["名称"]});
+      });
+    });
+    var minsAll=0;
+    state.records.forEach(function(r){
+      if(r["日期"]!==todayK)return;
+      minsAll+=num(r["用时分钟"]);
+      var g=goalById(r["目标ID"]);
+      if(g&&isListGoal(g))return; // 清单条目已在上方展示，不重复
+      rows.push({color:g?(g["配色"]||"#7C5CFF"):"#B8BCC8",name:"+"+num(r["完成量"])+" "+(g?(g["单位"]||""):""),theme:g?g["名称"]:"(已删除)"});
+    });
+    var head='<div class="tdone-sum">'+(rows.length
+      ?('今日共学 <b>'+rows.length+'</b> 项'+(minsAll>0?(' · 投入 <b>'+minsAll+'</b> 分钟'):'')+'，干得漂亮 🎉')
+      :'今天还没有学习记录，学完记得回来打卡 ✍️')+'</div>';
+    var body=rows.length?('<div class="kwlist">'+rows.map(function(e){
+      return '<span class="kw done"><span class="box"></span>'+esc(e.name)+'<span class="kwdate">'+esc(e.theme)+'</span></span>';
+    }).join("")+'</div>'):"";
+    el.innerHTML=head+body;
+  }
   function renderToday(){
+    renderTodayDone();
     var today=todayMid();
     var handles=[],cards=[];
     var gs=state.goals.slice();
@@ -1928,9 +2003,8 @@
       var color=g["配色"]||"#7C5CFF";
       var total=listOf(g).length;
       var pct=total?Math.round(c/total*100):0;
-      distRows+='<div class="dist-row"><span class="dist-name">'+esc(g["名称"])+'</span>'+
-        '<span class="dist-bar"><span class="dist-fill" style="width:'+pct+'%;background:'+color+'"></span></span>'+
-        '<span class="dist-n">'+c+' 项</span></div>';
+      distRows+='<div class="dist-row"><div class="dist-top"><span class="dist-name">'+esc(g["名称"])+'</span><span class="dist-n">'+c+' 项</span></div>'+
+        '<span class="dist-bar"><span class="dist-fill" style="width:'+pct+'%;background:'+color+'"></span></span></div>';
     });
     // 时间线（合并：清单知识点 + 总量打卡，按日期倒序）
     var tl=knowList.concat(recList);
@@ -1950,7 +2024,10 @@
         masterHtml+='<div class="master-row"><span class="tl-dot" style="background:'+color+'"></span>'+
           '<span class="master-theme">'+esc(g["名称"])+'</span><span class="master-n">'+dn+'/'+it.length+' 项</span></div>';
         var todo=it.filter(function(x){return !x.d;});
-        if(todo.length)masterHtml+='<div class="master-todo">未学：'+todo.map(function(x){return esc(x.n);}).join("、")+'</div>';
+        if(todo.length)masterHtml+='<div class="master-todo">'+listGroupedChunks(it,todo).map(function(gp){
+          return (gp.name?'<div class="kw-group">'+esc(gp.name)+'</div>':'')+
+            gp.idxs.map(function(i){return '<div class="mt-item">'+esc(it[i].n)+'</div>';}).join("");
+        }).join("")+'</div>';
       }else{
         var st=statsOf(g),color=g["配色"]||"#7C5CFF";
         masterHtml+='<div class="master-row"><span class="tl-dot" style="background:'+color+'"></span>'+
@@ -2236,7 +2313,54 @@
 
   /* ---------- refresh orchestration ---------- */
   function refreshAll(){
-    renderToday();renderBoard();renderStats();renderWeek();
+    renderToday();renderBoard();renderStats();renderWeek();renderRailCal();
+  }
+
+  /* ---------- 右侧信息栏：时钟 + 日历 ---------- */
+  var WD_CN="日一二三四五六";
+  function renderRailClock(){
+    var el=$("rail-time");if(!el)return;
+    var n=new Date();
+    el.textContent=pad(n.getHours())+":"+pad(n.getMinutes())+":"+pad(n.getSeconds());
+    $("rail-date").textContent=n.getFullYear()+" 年 "+(n.getMonth()+1)+" 月 "+n.getDate()+" 日 · 星期"+WD_CN.charAt(n.getDay());
+  }
+  function railStudiedDays(){
+    var set={};
+    state.records.forEach(function(r){var d=parseDate(r["日期"]);if(d)set[fmtDate(d)]=1;});
+    state.goals.forEach(function(g){
+      if(!isListGoal(g))return;
+      listOf(g).forEach(function(x){if(x.d)set[x.d]=1;});
+    });
+    return set;
+  }
+  function renderRailCal(){
+    var grid=$("cal-grid");if(!grid)return;
+    var base=todayMid();
+    base.setDate(1);
+    base.setMonth(base.getMonth()+(state.calCursor||0));
+    var y=base.getFullYear(),m=base.getMonth();
+    $("cal-title").textContent=y+" 年 "+(m+1)+" 月";
+    var start=(new Date(y,m,1).getDay()+6)%7; // 周一为第一列
+    var dim=new Date(y,m+1,0).getDate();
+    var prevDim=new Date(y,m,0).getDate();
+    var studied=railStudiedDays();
+    var todayK=fmtDate(todayMid());
+    var html="";
+    ["一","二","三","四","五","六","日"].forEach(function(w){html+='<div class="cal-wd">'+w+'</div>';});
+    for(var i=0;i<start;i++)html+='<div class="cal-d dim">'+(prevDim-start+1+i)+'</div>';
+    for(var d=1;d<=dim;d++){
+      var k=y+"-"+pad(m+1)+"-"+pad(d);
+      html+='<div class="cal-d'+(k===todayK?" today":"")+'">'+d+(studied[k]?'<span class="studied"></span>':'')+'</div>';
+    }
+    grid.innerHTML=html;
+  }
+  function initRail(){
+    if(!$("rail-time"))return;
+    renderRailClock();
+    renderRailCal();
+    setInterval(renderRailClock,1000);
+    $("cal-prev").onclick=function(){state.calCursor=(state.calCursor||0)-1;renderRailCal();};
+    $("cal-next").onclick=function(){state.calCursor=(state.calCursor||0)+1;renderRailCal();};
   }
 
   /* ---------- events ---------- */
@@ -2247,6 +2371,7 @@
   }
   function bind(){
     document.querySelectorAll(".navbtn").forEach(function(b){b.onclick=function(){switchTab(b.getAttribute("data-tab"));};});
+    initRail();
     $("new-goal-top").onclick=function(){openGoalModal(null);};
     $("new-goal-bottom").onclick=function(){openGoalModal(null);};
     $("sync-btn").onclick=function(){bootstrap();};
