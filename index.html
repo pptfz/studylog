@@ -136,10 +136,10 @@
   .kw.on{border-color:var(--green);background:var(--greenSoft);color:#157a4b}
   .kw.on .box{border-color:var(--green);background:var(--green)}
   .kw.on .box:after{opacity:1}
-  .kw.done{opacity:.62;background:var(--line);border-color:var(--line);color:var(--muted);cursor:default}
+  .kw.done{opacity:1;background:var(--greenSoft);border-color:#CBE9D8;color:var(--text);cursor:default}
   .kw.done .box{background:var(--green);border-color:var(--green)}
   .kw.done .box:after{opacity:1}
-  .kwdate{font-size:11px;color:var(--muted2);font-weight:500}
+  .kwdate{font-size:11px;color:var(--muted);font-weight:600}
   .kw-group{flex-basis:100%;display:flex;align-items:center;gap:6px;font-size:12px;font-weight:800;color:var(--purple);margin:8px 0 0}
   .kw-group:first-child{margin-top:0}
   .kw-group:before{content:"";width:3px;height:12px;border-radius:2px;background:var(--purple);flex:none}
@@ -252,20 +252,35 @@
     .main{margin-right:268px}
   }
   .rail-card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px;margin-bottom:14px}
-  .rail-time{font-size:34px;font-weight:800;color:var(--text);letter-spacing:.02em;font-variant-numeric:tabular-nums;line-height:1.1}
-  .rail-date{font-size:13px;color:var(--muted);font-weight:700;margin-top:4px}
-  .cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
-  .cal-title{font-weight:800;font-size:14px;color:var(--text)}
+  .rail-clock{position:relative;overflow:hidden;border:none;background:linear-gradient(135deg,var(--purple) 0%,#5B8CFF 60%,#3AA0FF 100%);box-shadow:0 8px 20px rgba(124,92,255,.35)}
+  .rail-clock:before{content:"";position:absolute;right:-26px;top:-26px;width:110px;height:110px;border-radius:50%;background:rgba(255,255,255,.14)}
+  .rail-clock:after{content:"";position:absolute;right:18px;bottom:-34px;width:64px;height:64px;border-radius:50%;background:rgba(255,255,255,.1)}
+  .rail-time{font-size:38px;font-weight:800;color:#fff;letter-spacing:.02em;font-variant-numeric:tabular-nums;line-height:1.1;text-shadow:0 2px 6px rgba(31,36,48,.18)}
+  .rail-date{font-size:13px;color:rgba(255,255,255,.92);font-weight:700;margin-top:5px}
+  .cal-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px}
+  .cal-title{font-weight:800;font-size:14px;color:var(--text);white-space:nowrap}
+  .cal-navs{display:flex;gap:5px}
   .cal-btn{width:28px;height:28px;border-radius:9px;border:1px solid var(--line);background:#fff;color:var(--muted);font-size:17px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.12s;padding:0}
-  .cal-btn:hover{color:var(--purple);border-color:var(--purple)}
+  .cal-btn:hover{color:var(--purple);border-color:var(--purple);background:var(--purpleSoft)}
+  .cal-btn.wide{width:auto;padding:0 10px;font-size:12px;font-weight:700}
+  .cal-btn.wide.hidden-btn{display:none}
   .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;text-align:center}
-  .cal-wd{font-size:11px;color:var(--muted2);font-weight:700;padding:4px 0}
-  .cal-d{position:relative;font-size:12.5px;padding:6px 0 8px;border-radius:8px;color:var(--text);font-weight:600}
-  .cal-d.dim{color:var(--muted2);opacity:.5}
-  .cal-d.today{background:var(--purple);color:#fff;font-weight:800}
+  .cal-wd{font-size:11px;color:var(--muted);font-weight:700;padding:4px 0}
+  .cal-d{position:relative;font-size:12.5px;padding:6px 0 7px;border-radius:8px;color:var(--text);font-weight:600;cursor:pointer;transition:.1s;border:1.5px solid transparent}
+  .cal-d:hover{background:var(--purpleSoft);border-color:var(--purple)}
+  .cal-d.dim{color:var(--muted2);opacity:.55}
+  .cal-d.off{cursor:default}
+  .cal-d.off:hover{background:none;border-color:transparent}
+  .cal-d.studied-day{background:var(--greenSoft);border-color:#CBE9D8;color:var(--green);font-weight:800}
+  .cal-d.studied-day:hover{background:#D8F1E4}
+  .cal-d.today{background:var(--purple);border-color:var(--purple);color:#fff;font-weight:800;box-shadow:0 3px 10px rgba(124,92,255,.4)}
+  .cal-d.today:hover{background:var(--purple2)}
   .cal-d .studied{position:absolute;left:50%;transform:translateX(-50%);bottom:2px;width:4px;height:4px;border-radius:50%;background:var(--green)}
   .cal-d.today .studied{background:#fff}
-  .cal-tip{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted2);margin-top:10px;font-weight:600}
+  .cal-foot{display:flex;align-items:center;justify-content:space-between;margin-top:10px}
+  .cal-tip{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted);font-weight:600}
+  .cal-goto{font-size:12px;font-weight:700;color:var(--purple);padding:4px 8px;border-radius:8px}
+  .cal-goto:hover{background:var(--purpleSoft)}
   .statcard-opt{display:flex;align-items:center;gap:9px;padding:11px 4px;border-bottom:1px solid var(--line);font-size:15px;font-weight:600;cursor:pointer}
   .statcard-opt:last-child{border-bottom:none}
   .statcard-opt input{width:20px;height:20px;accent-color:var(--purple);flex:none}
@@ -350,8 +365,19 @@
       <div class="cal-title" id="cal-title">—</div>
       <button class="cal-btn" id="cal-next" title="下个月">›</button>
     </div>
+    <div class="cal-head" style="margin-bottom:8px;margin-top:-4px">
+      <div class="cal-navs">
+        <button class="cal-btn wide" id="cal-prevy" title="上一年">«去年</button>
+      </div>
+      <button class="cal-btn wide" id="cal-today" title="回到本月">本月</button>
+      <div class="cal-navs">
+        <button class="cal-btn wide" id="cal-nexty" title="下一年">明年 »</button>
+      </div>
+    </div>
     <div class="cal-grid" id="cal-grid"></div>
-    <div class="cal-tip"><span class="studied" style="position:static;transform:none"></span>有学习记录的日子</div>
+    <div class="cal-foot">
+      <div class="cal-tip"><span class="studied" style="position:static;transform:none"></span>有学习记录的日子（点击查看详情）</div>
+    </div>
   </div>
 </div>
 
@@ -2345,14 +2371,47 @@
     var prevDim=new Date(y,m,0).getDate();
     var studied=railStudiedDays();
     var todayK=fmtDate(todayMid());
+    var isCur=(state.calCursor||0)===0;
+    $("cal-today").classList.toggle("hidden-btn",isCur);
     var html="";
     ["一","二","三","四","五","六","日"].forEach(function(w){html+='<div class="cal-wd">'+w+'</div>';});
-    for(var i=0;i<start;i++)html+='<div class="cal-d dim">'+(prevDim-start+1+i)+'</div>';
+    for(var i=0;i<start;i++)html+='<div class="cal-d dim off">'+(prevDim-start+1+i)+'</div>';
     for(var d=1;d<=dim;d++){
       var k=y+"-"+pad(m+1)+"-"+pad(d);
-      html+='<div class="cal-d'+(k===todayK?" today":"")+'">'+d+(studied[k]?'<span class="studied"></span>':'')+'</div>';
+      var isToday=k===todayK,stu=!!studied[k];
+      var cls="cal-d"+(isToday?" today":(stu?" studied-day":""));
+      html+='<div class="'+cls+'" data-date="'+k+'"'+(stu?' title="查看当天学习记录"':'')+'>'+d+(stu?'<span class="studied"></span>':'')+'</div>';
     }
+    var tail=(7-((start+dim)%7))%7;
+    for(var t=1;t<=tail;t++)html+='<div class="cal-d dim off">'+t+'</div>';
     grid.innerHTML=html;
+  }
+  function showDayDetails(k){
+    var rows=[];
+    state.goals.forEach(function(g){
+      if(!isListGoal(g))return;
+      var color=g["配色"]||"#7C5CFF";
+      listOf(g).forEach(function(x){
+        if(x.d===k)rows.push({color:color,name:x.n,theme:g["名称"]});
+      });
+    });
+    var mins=0;
+    state.records.forEach(function(r){
+      if(r["日期"]!==k)return;
+      mins+=num(r["用时分钟"]);
+      var g=goalById(r["目标ID"]);
+      if(g&&isListGoal(g))return; // 清单条目已在上方，不重复
+      rows.push({color:g?(g["配色"]||"#7C5CFF"):"#B8BCC8",name:"+"+num(r["完成量"])+" "+(g?(g["单位"]||""):""),theme:g?g["名称"]:"(已删除)"});
+    });
+    var dt=parseDate(k);
+    var head='<div style="color:var(--text);font-weight:800;margin-bottom:6px">'+(rows.length
+      ?('当天共学 <b>'+rows.length+'</b> 项'+(mins>0?(' · 投入 <b>'+mins+'</b> 分钟'):''))
+      :'这一天没有学习记录')+'</div>';
+    var list=rows.length?('<div style="color:var(--text);line-height:2">'+rows.map(function(e){
+      return '<div><span class="tl-dot" style="display:inline-block;background:'+e.color+';margin-right:7px;vertical-align:middle"></span>'+esc(e.name)+
+        ' <span style="color:var(--muted);font-size:12px">· '+esc(e.theme)+'</span></div>';
+    }).join("")+'</div>'):'';
+    uiDialog({title:fmtMD(dt)+" 学习记录",body:head+list,okText:"关闭"});
   }
   function initRail(){
     if(!$("rail-time"))return;
@@ -2361,6 +2420,14 @@
     setInterval(renderRailClock,1000);
     $("cal-prev").onclick=function(){state.calCursor=(state.calCursor||0)-1;renderRailCal();};
     $("cal-next").onclick=function(){state.calCursor=(state.calCursor||0)+1;renderRailCal();};
+    $("cal-prevy").onclick=function(){state.calCursor=(state.calCursor||0)-12;renderRailCal();};
+    $("cal-nexty").onclick=function(){state.calCursor=(state.calCursor||0)+12;renderRailCal();};
+    $("cal-today").onclick=function(){state.calCursor=0;renderRailCal();};
+    $("cal-grid").addEventListener("click",function(e){
+      var cell=e.target.closest?e.target.closest(".cal-d"):null;
+      if(!cell||!cell.getAttribute("data-date"))return;
+      showDayDetails(cell.getAttribute("data-date"));
+    });
   }
 
   /* ---------- events ---------- */
