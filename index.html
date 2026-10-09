@@ -140,6 +140,9 @@
   .kw.done .box{background:var(--green);border-color:var(--green)}
   .kw.done .box:after{opacity:1}
   .kwdate{font-size:11px;color:var(--muted2);font-weight:500}
+  .kw-group{flex-basis:100%;display:flex;align-items:center;gap:6px;font-size:12px;font-weight:800;color:var(--purple);margin:8px 0 0}
+  .kw-group:first-child{margin-top:0}
+  .kw-group:before{content:"";width:3px;height:12px;border-radius:2px;background:var(--purple);flex:none}
   .list-block{margin-top:12px;border-top:1px dashed var(--line);padding-top:10px}
   .lb-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px}
   .lb-title{font-size:12px;font-weight:800;color:var(--muted);letter-spacing:.03em}
@@ -675,7 +678,7 @@
     if(typeof raw==="string"){try{arr=JSON.parse(raw);}catch(e){arr=null;}}
     else if(Object.prototype.toString.call(raw)==="[object Array]"){arr=raw;}
     if(!arr||!arr.length)return [];
-    return arr.filter(function(x){return x&&x.n;}).map(function(x){return {n:""+x.n,d:x.d||null};});
+    return arr.filter(function(x){return x&&x.n;}).map(function(x){return {n:""+x.n,d:x.d||null,g:(x.g?("" + x.g):"")};});
   }
   function isListGoal(g){return listOf(g).length>0;}
   function listDone(items){var n=0;items.forEach(function(x){if(x.d)n++;});return n;}
@@ -686,17 +689,78 @@
     var set={};items.forEach(function(x){if(x.d&&x.d.length>=7)set[x.d.slice(0,7)]=1;});
     return Object.keys(set).sort().reverse();
   }
-  function listItemsText(items){return items.map(function(x){return x.n;}).join("\n");}
-  function listSaveItemsText(existing,text){
-    // 编辑清单后：按名称匹配，保留原有完成日期；删除旧名称则丢弃；新增名称未学
-    var old={};existing.forEach(function(x){old[x.n]=x.d;});
-    var out=[];
-    String(text||"").split("\n").forEach(function(line){
-      var n=line.trim();if(!n)return;
-      if(n in old){out.push({n:n,d:old[n]});delete old[n];}
-      else out.push({n:n,d:null});
-    });
+  /* 清单文本解析：支持分组层级。
+     分组标题写法（任选其一）：`- **分组名**`、`**分组名**`、`# 分组名`、`分组名：`，
+     标题行不计入条目，其后的条目自动归入该组；带缩进的行归入上方最近的未缩进行（该行升级为标题）。 */
+  function listCleanName(s){
+    return String(s).trim()
+      .replace(/^[-*•·]\s+/,"")
+      .replace(/^#{1,6}\s*/,"")
+      .replace(/\*\*/g,"")
+      .replace(/[：:]$/,"")
+      .trim();
+  }
+  function isListHeader(line){
+    var s=String(line).trim();
+    if(/^#{1,6}\s*\S/.test(s))return true;
+    var t=s.replace(/^[-*•·]\s+/,"").trim();
+    if(/^\*\*[^*]+\*\*[：:]?$/.test(t))return true;
+    if(/[^-*•·#**\d\s][：:]$/.test(s)&&!/^([-*•·]\s|\d)/.test(s))return true;
+    return false;
+  }
+  function listParseText(text){
+    var lines=String(text||"").split("\n"),i,j;
+    var headerIdx={};
+    for(i=0;i<lines.length;i++){
+      if(lines[i].trim()&&isListHeader(lines[i]))headerIdx[i]=1;
+    }
+    // 缩进层级：缩进行向上找最近的未缩进行，该行升级为分组标题
+    for(i=0;i<lines.length;i++){
+      if(!lines[i].trim()||!/^\s/.test(lines[i])||headerIdx[i])continue;
+      for(j=i-1;j>=0;j--){
+        if(!lines[j].trim())continue;
+        if(!/^\s/.test(lines[j])&&!headerIdx[j])headerIdx[j]=1;
+        break;
+      }
+    }
+    var out=[],group="";
+    for(i=0;i<lines.length;i++){
+      if(!lines[i].trim())continue;
+      if(headerIdx[i]){var h=listCleanName(lines[i]);if(h)group=h;continue;}
+      var n=listCleanName(lines[i]);
+      if(!n)continue;
+      out.push({n:n,g:group||null});
+    }
     return out;
+  }
+  function listGroupedChunks(items,sub){ // 子集按分组切成连续区块：[{name,idxs:[原始下标]}]
+    var groups=[];
+    sub.forEach(function(x){
+      var gi=items.indexOf(x),gn=x.g||"";
+      var last=groups[groups.length-1];
+      if(last&&last.name===gn)last.idxs.push(gi);
+      else groups.push({name:gn,idxs:[gi]});
+    });
+    return groups;
+  }
+  function listItemsText(items){
+    var out=[],lastG=null;
+    items.forEach(function(x){
+      var gp=x.g||"";
+      if(gp&&gp!==lastG)out.push("- **"+gp+"**");
+      lastG=gp;
+      out.push("- "+x.n);
+    });
+    return out.join("\n");
+  }
+  function listSaveItemsText(existing,text){
+    // 编辑清单后：按清理后的名称匹配，保留原有完成日期（兼容旧数据带 "- "/"**" 的名称）；删除旧名称则丢弃；新增名称未学
+    var old={};
+    existing.forEach(function(x){var k=listCleanName(x.n);if(k&&!(k in old))old[k]=x.d;});
+    return listParseText(text).map(function(x){
+      var d=(x.n in old)?old[x.n]:null;delete old[x.n];
+      return {n:x.n,d:d,g:x.g};
+    });
   }
   /* ---------- 登录门禁：GitHub 服务端校验令牌 + 可选本地口令 + 会话有效期 ---------- */
   var LOCK_KEY="wb_lg_unlock",PIN_KEY="wb_lg_pin",SESS_KEY="wb_lg_sess_days";
@@ -1506,8 +1570,11 @@
       '<div class="ci-stat">连续<b>'+(s.streak||0)+' 天</b></div>';
     var todoHtml='<div class="small muted" style="margin:8px 0 4px">本次学到（可多选）：</div>'+
       '<div class="kwlist" id="kw-'+g._id+'">'+
-      (todo.length?todo.map(function(x){
-        return '<button type="button" class="kw" data-i="'+items.indexOf(x)+'"><span class="box"></span>'+esc(x.n)+'</button>';
+      (todo.length?listGroupedChunks(items,todo).map(function(gp){
+        return (gp.name?'<div class="kw-group">'+esc(gp.name)+'</div>':'')+
+          gp.idxs.map(function(i){
+            return '<button type="button" class="kw" data-i="'+i+'"><span class="box"></span>'+esc(items[i].n)+'</button>';
+          }).join("");
       }).join(""):'')+
       '</div>';
     var actionsRow='<div class="ci-btns" style="margin-top:6px">'+
@@ -1710,13 +1777,18 @@
     var opts=months.map(function(m){return '<option value="'+m+'"'+(m===ym?" selected":"")+'>'+m.replace("-"," 年 ")+' 月</option>';}).join("");
     var learnedInYm=items.filter(function(x){return x.d&&x.d.indexOf(ym)===0;});
     var ymHtml=learnedInYm.length
-      ?learnedInYm.map(function(x){return '<span class="kw done"><span class="box"></span>'+esc(x.n)+'<span class="kwdate">'+fmtMD(parseDate(x.d))+'</span></span>';}).join("")
+      ?listGroupedChunks(items,learnedInYm).map(function(gp){
+        return (gp.name?'<div class="kw-group">'+esc(gp.name)+'</div>':'')+
+          gp.idxs.map(function(i){return '<span class="kw done"><span class="box"></span>'+esc(items[i].n)+'<span class="kwdate">'+fmtMD(parseDate(items[i].d))+'</span></span>';}).join("");
+      }).join("")
       :'<div class="small muted">该月暂无学习记录</div>';
     var todoHtml=todo.length
-      ?todo.map(function(x,i){
-        var origIdx=items.indexOf(x);
-        return '<span class="kw" style="border-style:dashed">'+esc(x.n)+
-          '<button type="button" class="qmark" data-g="'+g._id+'" data-i="'+origIdx+'" title="标记今天已学"><svg viewBox="0 0 24 24" width="15" height="15" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button></span>';
+      ?listGroupedChunks(items,todo).map(function(gp){
+        return (gp.name?'<div class="kw-group">'+esc(gp.name)+'</div>':'')+
+          gp.idxs.map(function(i){
+            return '<span class="kw" style="border-style:dashed">'+esc(items[i].n)+
+              '<button type="button" class="qmark" data-g="'+g._id+'" data-i="'+i+'" title="标记今天已学"><svg viewBox="0 0 24 24" width="15" height="15" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button></span>';
+          }).join("");
       }).join("")
       :'';
     return '<div class="list-block">'+
@@ -1995,9 +2067,9 @@
       '<div class="mask" id="mask"><div class="modal">'+
       '<h3>'+(g?"编辑主题":"新建学习主题")+'</h3>'+
       '<div class="form-row"><label>名称</label><input id="m-name" placeholder="如：K8s 知识点掌握" value="'+esc(g?g["名称"]:(dr?dr.name:""))+'"></div>'+
-      '<div class="form-row"><label>学习清单（选填，每行一个知识点，学到就勾掉）</label>'+
-        '<textarea id="m-list" rows="5" placeholder="如：\nPod 基础\nService 与 Ingress\nDeployment 滚动更新">'+esc(glistText)+'</textarea>'+
-        '<div class="small muted">填写清单后，进度按「已学 / 总数」计，可不设总量。删除已学过的行会丢失该行历史。</div></div>'+
+      '<div class="form-row"><label>学习清单（选填，每行一个知识点，学到就勾掉，支持分组）</label>'+
+        '<textarea id="m-list" rows="6" placeholder="如：\n- **Docker 基础**\n- 1.Docker 的基本原理和安装\n- 2.Docker 的基本操作\n- **Kubernetes 基础**\n- 5.Kubernetes 简介与安装">'+esc(glistText)+'</textarea>'+
+        '<div class="small muted">填写清单后，进度按「已学 / 总数」计，可不设总量。分组：`- **分组名**`、`**分组名**`、`# 分组名` 或以冒号结尾的行作为分组标题（不计入条目），其后的条目归入该组；缩进的行归入上方未缩进的行。直接粘贴 Markdown 清单即可自动识别。删除已学过的行会丢失该行历史。</div></div>'+
       '<div class="form-2">'+
         '<div class="form-row"><label>单位（清单式可空）</label><input id="m-unit" placeholder="个/页/节" value="'+esc(unitVal)+'"></div>'+
         '<div class="form-row"><label>总量（清单式可空）</label><input id="m-total" type="number" value="'+esc(totalVal)+'" placeholder="0 表示不设总量"></div>'+
