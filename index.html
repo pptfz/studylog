@@ -259,6 +259,13 @@
   .rail-date{font-size:13px;color:rgba(255,255,255,.92);font-weight:700;margin-top:5px}
   .cal-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px}
   .cal-title{font-weight:800;font-size:14px;color:var(--text);white-space:nowrap}
+  .cal-title-btn{cursor:pointer;transition:.12s}
+  .cal-title-btn:hover{color:var(--purple)}
+  .cal-picker{border-top:1px dashed var(--line);margin-top:4px;padding-top:10px;margin-bottom:8px}
+  .cal-months{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+  .cal-m{padding:9px 0;border-radius:10px;border:1.5px solid var(--line);background:#fff;font-size:13px;font-weight:700;color:var(--text);text-align:center;cursor:pointer;transition:.1s}
+  .cal-m:hover{border-color:var(--purple);color:var(--purple);background:var(--purpleSoft)}
+  .cal-m.cur{background:var(--purple);border-color:var(--purple);color:#fff}
   .cal-navs{display:flex;gap:5px}
   .cal-btn{width:28px;height:28px;border-radius:9px;border:1px solid var(--line);background:#fff;color:var(--muted);font-size:17px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.12s;padding:0}
   .cal-btn:hover{color:var(--purple);border-color:var(--purple);background:var(--purpleSoft)}
@@ -362,8 +369,16 @@
   <div class="rail-card">
     <div class="cal-head">
       <button class="cal-btn" id="cal-prev" title="上个月">‹</button>
-      <div class="cal-title" id="cal-title">—</div>
+      <div class="cal-title cal-title-btn" id="cal-title" title="点击选择年月">—</div>
       <button class="cal-btn" id="cal-next" title="下个月">›</button>
+    </div>
+    <div class="cal-picker hidden" id="cal-picker">
+      <div class="cal-head" style="margin-bottom:8px">
+        <button class="cal-btn" id="calp-prevy" title="上一年">‹</button>
+        <div class="cal-title" id="calp-year">—</div>
+        <button class="cal-btn" id="calp-nexty" title="下一年">›</button>
+      </div>
+      <div class="cal-months" id="calp-months"></div>
     </div>
     <div class="cal-head" style="margin-bottom:8px;margin-top:-4px">
       <div class="cal-navs">
@@ -2413,16 +2428,47 @@
     }).join("")+'</div>'):'';
     uiDialog({title:fmtMD(dt)+" 学习记录",body:head+list,okText:"关闭"});
   }
+  var calPickYear=0;
+  function calPickerYearBase(){var b=todayMid();b.setDate(1);b.setMonth(b.getMonth()+(state.calCursor||0));return b;}
+  function toggleCalPicker(force){
+    var p=$("cal-picker");if(!p)return;
+    var show=(force!==undefined)?force:p.classList.contains("hidden");
+    if(show){
+      calPickYear=calPickerYearBase().getFullYear();
+      p.classList.remove("hidden");
+      renderCalPicker();
+    }else p.classList.add("hidden");
+  }
+  function renderCalPicker(){
+    $("calp-year").textContent=calPickYear+" 年";
+    var now=todayMid(),cur=calPickerYearBase();
+    var selM=(cur.getFullYear()===calPickYear)?cur.getMonth():-1;
+    var html="";
+    for(var m=0;m<12;m++)html+='<div class="cal-m'+(m===selM?" cur":"")+'" data-m="'+m+'">'+(m+1)+' 月</div>';
+    $("calp-months").innerHTML=html;
+  }
   function initRail(){
     if(!$("rail-time"))return;
     renderRailClock();
     renderRailCal();
     setInterval(renderRailClock,1000);
-    $("cal-prev").onclick=function(){state.calCursor=(state.calCursor||0)-1;renderRailCal();};
-    $("cal-next").onclick=function(){state.calCursor=(state.calCursor||0)+1;renderRailCal();};
-    $("cal-prevy").onclick=function(){state.calCursor=(state.calCursor||0)-12;renderRailCal();};
-    $("cal-nexty").onclick=function(){state.calCursor=(state.calCursor||0)+12;renderRailCal();};
-    $("cal-today").onclick=function(){state.calCursor=0;renderRailCal();};
+    $("cal-prev").onclick=function(){toggleCalPicker(false);state.calCursor=(state.calCursor||0)-1;renderRailCal();};
+    $("cal-next").onclick=function(){toggleCalPicker(false);state.calCursor=(state.calCursor||0)+1;renderRailCal();};
+    $("cal-prevy").onclick=function(){toggleCalPicker(false);state.calCursor=(state.calCursor||0)-12;renderRailCal();};
+    $("cal-nexty").onclick=function(){toggleCalPicker(false);state.calCursor=(state.calCursor||0)+12;renderRailCal();};
+    $("cal-today").onclick=function(){toggleCalPicker(false);state.calCursor=0;renderRailCal();};
+    $("cal-title").onclick=function(){toggleCalPicker();};
+    $("calp-prevy").onclick=function(){calPickYear--;renderCalPicker();};
+    $("calp-nexty").onclick=function(){calPickYear++;renderCalPicker();};
+    $("calp-months").addEventListener("click",function(e){
+      var el=e.target.closest?e.target.closest(".cal-m"):null;
+      if(!el)return;
+      var m=parseInt(el.getAttribute("data-m"),10);
+      var now=todayMid();
+      state.calCursor=(calPickYear-now.getFullYear())*12+(m-now.getMonth());
+      toggleCalPicker(false);
+      renderRailCal();
+    });
     $("cal-grid").addEventListener("click",function(e){
       var cell=e.target.closest?e.target.closest(".cal-d"):null;
       if(!cell||!cell.getAttribute("data-date"))return;
