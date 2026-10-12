@@ -262,6 +262,10 @@
   .cal-title-btn{cursor:pointer;transition:.12s}
   .cal-title-btn:hover{color:var(--purple)}
   .cal-picker{border-top:1px dashed var(--line);margin-top:4px;padding-top:10px;margin-bottom:8px}
+  .cal-select{appearance:none;-webkit-appearance:none;padding:8px 30px 8px 14px;border:1.5px solid var(--line);border-radius:10px;background:#fff url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%238A90A2' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 10px center;font-size:14px;font-weight:800;color:var(--text);cursor:pointer;min-width:118px;transition:.12s}
+  .cal-select:hover{border-color:var(--purple)}
+  .cal-select:focus{outline:none;border-color:var(--purple);box-shadow:0 0 0 3px var(--purpleSoft)}
+  .cal-select option{font-weight:600}
   .cal-months{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
   .cal-m{padding:9px 0;border-radius:10px;border:1.5px solid var(--line);background:#fff;font-size:13px;font-weight:700;color:var(--text);text-align:center;cursor:pointer;transition:.1s}
   .cal-m:hover{border-color:var(--purple);color:var(--purple);background:var(--purpleSoft)}
@@ -374,9 +378,7 @@
     </div>
     <div class="cal-picker hidden" id="cal-picker">
       <div class="cal-head" style="margin-bottom:8px">
-        <button class="cal-btn" id="calp-prevy" title="上一年">‹</button>
-        <div class="cal-title" id="calp-year">—</div>
-        <button class="cal-btn" id="calp-nexty" title="下一年">›</button>
+        <select class="cal-select" id="calp-yearsel" title="选择年份"></select>
       </div>
       <div class="cal-months" id="calp-months"></div>
     </div>
@@ -2429,6 +2431,7 @@
     uiDialog({title:fmtMD(dt)+" 学习记录",body:head+list,okText:"关闭"});
   }
   var calPickYear=0;
+  var CAL_YEAR_SPAN=15; // 年份下拉范围：当前年 ±15
   function calPickerYearBase(){var b=todayMid();b.setDate(1);b.setMonth(b.getMonth()+(state.calCursor||0));return b;}
   function toggleCalPicker(force){
     var p=$("cal-picker");if(!p)return;
@@ -2440,8 +2443,15 @@
     }else p.classList.add("hidden");
   }
   function renderCalPicker(){
-    $("calp-year").textContent=calPickYear+" 年";
-    var now=todayMid(),cur=calPickerYearBase();
+    var sel=$("calp-yearsel");
+    var nowY=todayMid().getFullYear();
+    var opts="";
+    for(var y=nowY-CAL_YEAR_SPAN;y<=nowY+CAL_YEAR_SPAN;y++){
+      opts+='<option value="'+y+'"'+(y===calPickYear?" selected":"")+'>'+y+' 年</option>';
+    }
+    sel.innerHTML=opts;
+    sel.value=""+calPickYear;
+    var cur=calPickerYearBase();
     var selM=(cur.getFullYear()===calPickYear)?cur.getMonth():-1;
     var html="";
     for(var m=0;m<12;m++)html+='<div class="cal-m'+(m===selM?" cur":"")+'" data-m="'+m+'">'+(m+1)+' 月</div>';
@@ -2458,8 +2468,7 @@
     $("cal-nexty").onclick=function(){toggleCalPicker(false);state.calCursor=(state.calCursor||0)+12;renderRailCal();};
     $("cal-today").onclick=function(){toggleCalPicker(false);state.calCursor=0;renderRailCal();};
     $("cal-title").onclick=function(){toggleCalPicker();};
-    $("calp-prevy").onclick=function(){calPickYear--;renderCalPicker();};
-    $("calp-nexty").onclick=function(){calPickYear++;renderCalPicker();};
+    $("calp-yearsel").onchange=function(){calPickYear=parseInt(this.value,10);renderCalPicker();};
     $("calp-months").addEventListener("click",function(e){
       var el=e.target.closest?e.target.closest(".cal-m"):null;
       if(!el)return;
