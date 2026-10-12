@@ -394,6 +394,7 @@
     <div class="cal-grid" id="cal-grid"></div>
     <div class="cal-foot">
       <div class="cal-tip"><span class="studied" style="position:static;transform:none"></span>有学习记录的日子（点击查看详情）</div>
+      <button class="cal-goto" id="cal-goto" title="跳回今天所在月份并查看今日记录">回到今天</button>
     </div>
   </div>
 </div>
@@ -2467,6 +2468,12 @@
     $("cal-prevy").onclick=function(){toggleCalPicker(false);state.calCursor=(state.calCursor||0)-12;renderRailCal();};
     $("cal-nexty").onclick=function(){toggleCalPicker(false);state.calCursor=(state.calCursor||0)+12;renderRailCal();};
     $("cal-today").onclick=function(){toggleCalPicker(false);state.calCursor=0;renderRailCal();};
+    $("cal-goto").onclick=function(){
+      toggleCalPicker(false);
+      state.calCursor=0;
+      renderRailCal();
+      showDayDetails(fmtDate(todayMid()));
+    };
     $("cal-title").onclick=function(){toggleCalPicker();};
     $("calp-yearsel").onchange=function(){calPickYear=parseInt(this.value,10);renderCalPicker();};
     $("calp-months").addEventListener("click",function(e){
